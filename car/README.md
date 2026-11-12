@@ -100,10 +100,10 @@ chassis
 └── arm_fl ── upright_fl ── wheel_fl    (one chain per corner)
 ```
 
-## Damage model (simple)
+## Damage model
 
-This is the plan for the damage step. The data it needs is already in
-`parts.json`.
+Built in `tc/damage.tc` from the data in `parts.json` (exported to
+`carPartStats` in `tc/car_data.tc`).
 
 1. **HP per part.** A hit (a collision or a hard landing) has a point, a
    direction and an energy. The parts whose `hitbox` the hit reaches take the

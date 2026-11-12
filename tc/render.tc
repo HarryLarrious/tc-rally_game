@@ -10,6 +10,9 @@ declare global linkEvery: num;
  * car-frame matrix with columns cx, cy, cz and translation t, interpolated
  * over `dur` ticks. */
 function setMover(id: str, cx: vec, cy: vec, cz: vec, t: vec, L: vec, U: vec, F: vec, dur: num) {
+    if (id == "") {
+        return;
+    }
     line wx = L * cx.x + U * cx.y + F * cx.z;
     line wy = L * cy.x + U * cy.y + F * cy.z;
     line wz = L * cz.x + U * cz.y + F * cz.z;
@@ -29,7 +32,7 @@ function carRender(c: num) {
     line o = global cPos[c] - (L * line com.x + U * line com.y + F * line com.z);
     line at = loc(line o.x, line o.y, line o.z);
 
-    select entitiesByName(global cAll[c] as list[str]);
+    select entitiesByName(global cTp[c] as list[str]);
     selectedEntity.teleport(line at);
     select reset;
     select entitiesByName(global cRigid[c] as list[str]);

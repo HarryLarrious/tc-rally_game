@@ -17,6 +17,8 @@
 declare global cAll: list;
 declare global cRigid: list;
 declare global cMove: list;
+/** Display UUIDs still on each car (teleported with it every tick). */
+declare global cTp: list;
 /** Seat entity UUID and driver UUID ("" when empty). */
 declare global cSeat: list[str];
 declare global cDriver: list[str];
@@ -42,6 +44,9 @@ declare global cAwake: list[num];
 declare global cStatic: list[num];
 /** Strongest impact speed (m/s) this tick, for sound and later damage. */
 declare global cImpact: list[num];
+/** Ticks left in which hits and bottoming out do no damage (after spawning,
+ * repairing or putting the car back on its wheels). */
+declare global cGrace: list[num];
 /** Per wheel, 4 per car (car c, corner i at (c - 1) * 4 + i): suspension
  * compression (m), roll angle (degrees), surface grip, and 1 when the tire
  * is sliding. */
@@ -89,31 +94,11 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     line left = line up.cross(line fwd);
 
     global carCount += 1;
-    line all = [];
-    line rigid = [];
-    line move = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
-    for (line row of carPartData()) {
-        line p = (line row as str).split(" ");
-        if (only != "" && line p[1] as str != only) {
-            continue;
-        }
-        line look = item("stone").setModel(line p[2] as str).setModelDataNumbers(paint, accent, type="Colors");
-        game.spawnItemDisplay(line origin, line look);
-        lastEntity.setDisplayTeleportDuration(1);
-        // Full brightness: the displays stand on the car origin at ground
-        // level, where the light DF samples would be 0.
-        lastEntity.setDisplayBrightness(15, 15);
-        line id = lastEntity.uuid;
-        line all.append(line id);
-        if (line p[3] as str == "rigid") {
-            line rigid.append(line id);
-        } else {
-            line move[moverIndex(line p[3] as str, num.parse(line p[4] as str))] = line id;
-        }
-    }
-    global cAll.append(line all);
-    global cRigid.append(line rigid);
-    global cMove.append(line move);
+    line sets = spawnDisplays(line origin, paint, accent, only);
+    global cAll.append(line sets[1]);
+    global cRigid.append(line sets[2]);
+    global cMove.append(line sets[3]);
+    global cTp.append(liveIds(line sets[1] as list));
 
     // The seat: an interaction entity the driver rides (drive.tc moves it).
     game.spawnInteractionEntity(line origin, 0.01, 0.01);
@@ -134,6 +119,7 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     global cHand.append(-10);
     global cAwake.append(60);
     global cImpact.append(0);
+    global cGrace.append(40);
     if (only != "") {
         global cStatic.append(1);
     } else {
@@ -145,10 +131,67 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
         global wMu.append(0.9);
         global wSlide.append(0);
     }
+    if (global gParts == 0) {
+        loadCarGeom();
+        loadPartStats();
+    }
+    carInitDamage(global carCount, paint, accent);
     if (only == "") {
         carRender(global carCount);
     }
     return global carCount;
+}
+
+/** The non-empty UUIDs of `ids`. */
+function liveIds(ids: list): list {
+    line out = [];
+    for (line id of ids) {
+        if (line id as str != "") {
+            line out.append(line id);
+        }
+    }
+    return line out;
+}
+
+/** Removes the displays in `ids`, skipping empty entries. */
+function removeDisplays(ids: list) {
+    for (line id of ids) {
+        if (line id as str != "") {
+            select entitiesByName(line id as str);
+            selectedEntity.remove();
+            select reset;
+        }
+    }
+}
+
+/** Spawns one car's part displays at `origin` (only part `only` when set):
+ * [every display in carPartData order, the rigid ones, the movers in mover
+ * order]. With `only` set, the other entries of the first list are "". */
+function spawnDisplays(origin: loc, paint: num, accent: num, only: str): list {
+    line all = [];
+    line rigid = [];
+    line move = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+    for (line row of carPartData()) {
+        line p = (line row as str).split(" ");
+        if (only != "" && line p[1] as str != only) {
+            line all.append("");
+            continue;
+        }
+        line look = item("stone").setModel(line p[2] as str).setModelDataNumbers(paint, accent, type="Colors");
+        game.spawnItemDisplay(origin, line look);
+        lastEntity.setDisplayTeleportDuration(1);
+        // Full brightness: the displays stand on the car origin at ground
+        // level, where the light DF samples would be 0.
+        lastEntity.setDisplayBrightness(15, 15);
+        line id = lastEntity.uuid;
+        line all.append(line id);
+        if (line p[3] as str == "rigid") {
+            line rigid.append(line id);
+        } else {
+            line move[moverIndex(line p[3] as str, num.parse(line p[4] as str))] = line id;
+        }
+    }
+    return [line all, line rigid, line move];
 }
 
 /** Messages the player which parts of car c have no display in the world. */
@@ -188,14 +231,26 @@ function clearCars {
             selected.rideEntity();
             select reset;
         }
-        select entitiesByName(global cAll[line c] as list[str]);
-        selectedEntity.remove();
-        select reset;
+        removeDisplays(global cAll[line c] as list);
         select entitiesByName(global cSeat[line c]);
         selectedEntity.remove();
         select reset;
     }
+    clearDebris(0);
+    global pHp = [];
+    global pOff = [];
+    global pLook = [];
+    global cPaint = [];
+    global cAccent = [];
+    global cPower = [];
+    global cGearMax = [];
+    global cOverheat = [];
+    global wDrive = [];
+    global wSpringF = [];
+    global wGripF = [];
+    global wGone = [];
     global cAll = [];
+    global cTp = [];
     global cRigid = [];
     global cMove = [];
     global cSeat = [];
@@ -214,6 +269,7 @@ function clearCars {
     global cAwake = [];
     global cStatic = [];
     global cImpact = [];
+    global cGrace = [];
     global wComp = [];
     global wSpin = [];
     global wMu = [];

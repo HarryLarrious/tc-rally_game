@@ -974,6 +974,34 @@ def write_tc_data(spec: dict) -> None:
         "gSteerX": sw["pivot"][0], "gSteerY": sw["pivot"][1], "gSteerZ": sw["pivot"][2], "gSteerTilt": sw["rest"][0],
         "gMass": spec["total_mass"],
     }
+    ids = [p["id"] for p in spec["parts"]]
+    idx = {pid: n + 1 for n, pid in enumerate(ids)}
+    for key, pid in (("iChassis", "chassis"), ("iShell", "shell"), ("iCage", "cage"), ("iEngine", "engine"),
+                     ("iGearbox", "gearbox"), ("iRadiator", "radiator"), ("iDriveshaft", "driveshaft"),
+                     ("iDiffF", "diff_f"), ("iDiffR", "diff_r"), ("iFuel", "fuel_tank"), ("iHood", "hood"),
+                     ("iWing", "wing")):
+        geom[key] = idx[pid]
+    for n, tag in enumerate(("fl", "fr", "rl", "rr"), start=1):
+        for kind in ("wheel", "upright", "arm", "spring", "halfshaft"):
+            geom[f"i{kind.capitalize()}{n}"] = idx[f"{kind}_{tag}"]
+    geom["gParts"] = len(ids)
+    stats = []
+    for p in spec["parts"]:
+        m = rest_matrix(p["pivot"], p["rest"])
+        lo, hi = p["hitbox"]
+        corners = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+        world = [tuple(sum(m[r * 4 + k] * c[k] for k in range(3)) + m[r * 4 + 3] for r in range(3)) for c in corners]
+        wlo = [min(w[i] for w in world) for i in range(3)]
+        whi = [max(w[i] for w in world) for i in range(3)]
+        center = [(a + b) / 2 for a, b in zip(wlo, whi)]
+        half = [(b - a) / 2 for a, b in zip(wlo, whi)]
+        local = [(a + b) / 2 for a, b in zip(lo, hi)]
+        rest = ",".join(tc_num(v) for v in m[:12]) if not p["rigid"] else "-"
+        shield = ",".join(str(idx[x]) for x in p["shield"]) or "-"
+        fields = [p["hp"], "d" if p["on_break"] == "detach" else "f", idx[p["parent"]] if p["parent"] else 0,
+                  1 if p["damaged_model"] else 0, *center, *half, *local]
+        stats.append('        "' + " ".join(tc_num(f) if isinstance(f, float) else str(f) for f in fields)
+                     + f' {shield} {rest}"')
     gl = "\n".join(f"    global {k} = {tc_num(v)};" for k, v in geom.items())
     decl = "\n".join(f"declare global {k}: num;" for k in geom)
     text = (
@@ -985,6 +1013,13 @@ def write_tc_data(spec: dict) -> None:
         "function carPartData(): list {\n    return [\n"
         + ",\n".join(rows) + "\n    ];\n}\n\n"
         f"/** Number of parts in a car. */\nfunction carPartCount(): num {{\n    return {len(rows)};\n}}\n\n"
+        "/** Damage data per part, in carPartData order: \"hp break parent damagedModel\n"
+        " * cx cy cz hx hy hz lx ly lz shields rest\". break: d = comes off, f = fails\n"
+        " * in place. parent: part index (0 = none). c/h: hitbox center and half size\n"
+        " * in the car frame at rest. l: hitbox center in the part's own model frame.\n"
+        " * shields: part indices that take hits first (- = none). rest: the mover's\n"
+        " * rest matrix, first 12 numbers row-major (- = rigid, identity). */\n"
+        "function carPartStats(): list {\n    return [\n" + ",\n".join(stats) + "\n    ];\n}\n\n"
         "/** Suspension and drawing geometry (car frame, meters) and the total mass. */\n"
         + decl + "\n\n/** Sets the geometry globals. */\nfunction loadCarGeom {\n" + gl + "\n}\n"
     )

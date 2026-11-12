@@ -62,6 +62,15 @@ function loadProbes {
     global gProbes.append(vec(0, 0.45, 2.08) - line com);
     global gProbes.append(vec(0, 0.45, -2.04) - line com);
     global gProbes.append(vec(0, 1.41, -0.4) - line com);
+    for (line x of [0.87, -0.87]) {
+        global gProbes.append(vec(line x as num, 0.65, 0.3) - line com);
+        global gProbes.append(vec(line x as num, 0.65, -0.9) - line com);
+    }
+    for (line x of [0.9, -0.9]) {
+        for (line z of [1.25, -1.25]) {
+            global gProbes.append(vec(line x as num, 0.32, line z as num) - line com);
+        }
+    }
 }
 
 /** Grip per surface. Asphalt-like blocks 1.0, gravel 0.7, grass 0.6, snow 0.4,
@@ -167,9 +176,25 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
             line shift = 3;
         }
     }
+    // A damaged gearbox loses the top gears; a broken one gives no drive.
+    if (line gear > global cGearMax[c]) {
+        line gear = num.max(1, global cGearMax[c]);
+        line ratio = gearRatio(line gear);
+    }
     line drive = 0;
-    if (line shift == 0) {
-        line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower;
+    if (line shift == 0 && global cGearMax[c] > 0) {
+        line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c];
+    }
+    // No radiator: the engine overheats under throttle. A hurt engine smokes.
+    if (global rTick % 20 == 0) {
+        if (global cOverheat[c] == 1 && line throttle > 0) {
+            partDamage(c, global iEngine, 6);
+        }
+    }
+    if (global rTick % 4 == 0) {
+        if (partHealth(c, global iEngine) < 0.5) {
+            allPlayers.displayParticleEffect(par("Large Smoke"), partWorld(c, global iEngine));
+        }
     }
     if (line gear == -1) {
         line drive = 0 - line drive * 0.6;
@@ -231,6 +256,7 @@ function carCollide(c: num) {
     line U = global cU[c];
     line F = global cF[c];
     line impact = 0;
+    line hitAt = vec(0, 0, 0);
     for (line pl of global gProbes) {
         line pv = line pl as vec;
         line r = line L * line pv.x + line U * line pv.y + line F * line pv.z;
@@ -273,7 +299,10 @@ function carCollide(c: num) {
                 line j = 0 - 1.3 * line vn / line kk;
                 line vel = line vel + line n * line j;
                 line w = line w + line rn * (line j * line mi);
-                line impact = num.max(line impact, 0 - line vn);
+                if (0 - line vn > line impact) {
+                    line impact = 0 - line vn;
+                    line hitAt = line pv + carCom();
+                }
                 line vt = line vp - line n * line vn;
                 line vtl = line vt.len();
                 if (line vtl > 0.01) {
@@ -291,6 +320,11 @@ function carCollide(c: num) {
     global cVel[c] = line vel;
     global cW[c] = line w;
     global cImpact[c] = line impact;
+    if (global cGrace[c] > 0) {
+        global cGrace[c] -= 1;
+    } else if (line impact > 3) {
+        impactDamage(c, line hitAt, line impact);
+    }
 }
 
 /** Suspension and tire force on car c's wheel i (1 front left, 2 front
@@ -302,6 +336,11 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     line meff = global gMass * 0.25;
     line com = carCom();
     line k = (c - 1) * 4 + i;
+    if (global wGone[line k] == 1) {
+        global wComp[line k] = 0;
+        global wSlide[line k] = 0;
+        return [vec(0, 0, 0), vec(0, 0, 0)];
+    }
     line side = 1;
     if (i % 2 == 0) {
         line side = -1;
@@ -318,9 +357,15 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     line d = (line hv - line mount).len();
     if (line d < 0.555) {
         line comp = 0.56 - line d;
-        line fs = global tSpring * line comp + global tDamper * (line comp - global wComp[line k]) / line dt;
+        line cvel = (line comp - global wComp[line k]) / line dt;
+        line fs = global tSpring * global wSpringF[line k] * line comp + global tDamper * line cvel;
         if (line comp > 0.21) {
             line fs += 150000 * (line comp - 0.21);
+            // Slamming into the bump stop hurts the spring and the arm.
+            if (line cvel > 2.5 && global cGrace[c] == 0) {
+                partDamage(c, [global iSpring1, global iSpring2, global iSpring3, global iSpring4][i] as num, (line cvel - 2.5) * 12);
+                partDamage(c, [global iArm1, global iArm2, global iArm3, global iArm4][i] as num, (line cvel - 2.5) * 6);
+            }
         }
         line fs = num.max(0, line fs);
         line r = line hv - line pos;
@@ -340,7 +385,7 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
                 global wMu[line k] = global surfDefault;
             }
         }
-        line fmax = global wMu[line k] * global tGrip * line fs;
+        line fmax = global wMu[line k] * global tGrip * global wGripF[line k] * line fs;
         line sgn = 1;
         if (line vlong < 0) {
             line sgn = -1;
@@ -348,9 +393,9 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
         // Sideways: take up part of the slip velocity this tick.
         line fy = 0 - line vlat * line meff / line dt * global tLatGain;
         // Along the wheel: drive (40% front, 60% rear), brakes, rolling.
-        line fx = drive * 0.2;
+        line fx = drive * 0.2 * global wDrive[line k];
         if (!line front) {
-            line fx = drive * 0.3;
+            line fx = drive * 0.3 * global wDrive[line k];
         }
         if (brake > 0) {
             line share = 0.2;
@@ -414,4 +459,5 @@ function carUpright(c: num) {
     global cW[c] = vec(0, 0, 0);
     global cPos[c] = global cPos[c] + vec(0, 1.2, 0);
     global cAwake[c] = 60;
+    global cGrace[c] = 40;
 }

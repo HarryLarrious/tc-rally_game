@@ -42,6 +42,9 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | `@exit` | Get out (same as F) |
 | `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, links |
 | `@dbg` | Toggle the physics debug readout in the action bar |
+| `@damage` | List the damaged parts of your car (or the nearest) |
+| `@hit PART AMOUNT` | Damage one part, e.g. `@hit bumper_f 50` (ids in [car/PARTS.md](car/PARTS.md)) |
+| `@fix` | Repair your car (or the nearest): fresh parts, full HP, back on its wheels |
 | `@part <id> [turn]` | Spawn one part only, to check its model |
 | `@carcheck` | List the newest car's parts that have no display |
 | `@clearcars` | Remove every car |
@@ -62,6 +65,19 @@ driven car costs about 5% plot CPU.
 
 DiamondFire numbers keep 3 decimals, so the physics works per unit mass
 (accelerations) and never multiplies by 1 / mass.
+
+## Damage
+
+`tc/damage.tc`. The strongest body hit of a tick above 3 m/s damages the
+parts whose hitbox is near the contact point; a part whose shields are also
+there and still on is protected (bumper before radiator, hood before engine),
+and the chassis takes a share of every hit. Slamming a wheel into its bump
+stop damages that spring and arm. Below 60% HP a part shows its damaged
+model. At 0 HP a part that comes off breaks away with everything it carries
+as tumbling debris; the others fail in place. Effects: engine power, lost top
+gears, axles or single wheels without drive, softer springs, punctured tires,
+missing wheels, and an engine that overheats without its radiator and smokes
+when hurt.
 
 ## View the car
 

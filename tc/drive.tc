@@ -126,6 +126,9 @@ function carsTick {
         }
         carRender(line c);
     }
+    if (global dCount > 0) {
+        debrisTick();
+    }
 }
 
 /** The driver's action bar: speed, gear, rpm and plot CPU. */
@@ -177,6 +180,7 @@ process carLoop {
     loadCarGeom();
     loadProbes();
     loadSurfaces();
+    loadPartStats();
     if (global tSpring == 0) {
         resetTuning();
     }

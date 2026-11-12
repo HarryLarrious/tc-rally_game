@@ -1,0 +1,556 @@
+// Damage: part HP, what broken parts do, and parts that come off.
+//
+// - Hits: the strongest body contact of a tick (physics.tc, carCollide) above
+//   3 m/s damages the parts whose hitbox is near the contact point. A part
+//   whose shield parts (car/PARTS.md) are also there and still on is
+//   protected: the bumper goes before the radiator, the hood before the
+//   engine. The chassis takes a share of every hit.
+// - Bottoming out: a wheel slamming into its bump stop damages its spring
+//   and control arm.
+// - Below 60% HP a part with a damaged model swaps to it (dents, cracked
+//   glass, torn tire).
+// - At 0 HP a "d" part comes off with everything it carries: its displays
+//   become a debris group that falls, tumbles and comes to rest. An "f" part
+//   stays and stops working.
+// - Effects (carEffects): engine power, top gear, axle and wheel drive,
+//   spring stiffness, tire grip, missing wheels, overheating.
+
+/** Per part (carPartStats order): max HP, 1 if it comes off, parent index,
+ * 1 if it has a damaged model, item model, hitbox center and half size (car
+ * frame), hitbox center in its own model frame, shield indices, rest matrix
+ * (12 numbers, empty = identity). */
+declare global sHp: list[num];
+declare global sDetach: list[num];
+declare global sParent: list[num];
+declare global sDmgModel: list[num];
+declare global sModel: list[str];
+declare global sC: list[vec];
+declare global sH: list[vec];
+declare global sLocal: list[vec];
+declare global sShield: list;
+declare global sRest: list;
+/** Per car part, (c - 1) * gParts + i: HP left, 1 when broken or off, 1
+ * when the damaged model is shown. */
+declare global pHp: list[num];
+declare global pOff: list[num];
+declare global pLook: list[num];
+/** Per car: paint and accent colors, engine power factor, highest usable
+ * gear, front and rear axle drive (0/1), 1 when the engine overheats. */
+declare global cPaint: list[num];
+declare global cAccent: list[num];
+declare global cPower: list[num];
+declare global cGearMax: list[num];
+declare global cOverheat: list[num];
+/** Per wheel: drive share factor, spring factor, grip factor, 1 when gone. */
+declare global wDrive: list[num];
+declare global wSpringF: list[num];
+declare global wGripF: list[num];
+declare global wGone: list[num];
+/** Debris groups: display UUIDs, each display's matrix relative to the group
+ * center [cx, cy, cz, t], state, ticks at rest (over 10 = frozen), owning car. */
+declare global dIds: list;
+declare global dA: list;
+declare global dPos: list[vec];
+declare global dVel: list[vec];
+declare global dW: list[vec];
+declare global dL: list[vec];
+declare global dU: list[vec];
+declare global dF: list[vec];
+declare global dRest: list[num];
+declare global dCar: list[num];
+declare global dCount: num;
+
+/** Parses carPartData and carPartStats into the s* lists. */
+function loadPartStats {
+    global sHp = [];
+    global sDetach = [];
+    global sParent = [];
+    global sDmgModel = [];
+    global sModel = [];
+    global sC = [];
+    global sH = [];
+    global sLocal = [];
+    global sShield = [];
+    global sRest = [];
+    for (line row of carPartData()) {
+        global sModel.append(((line row as str).split(" "))[2] as str);
+    }
+    for (line row of carPartStats()) {
+        line f = (line row as str).split(" ");
+        line n = [];
+        repeat (line j to 13) {
+            if (line j != 2) {
+                line n.append(num.parse(line f[line j] as str));
+            } else {
+                line n.append(0);
+            }
+        }
+        global sHp.append(line n[1] as num);
+        if (line f[2] as str == "d") {
+            global sDetach.append(1);
+        } else {
+            global sDetach.append(0);
+        }
+        global sParent.append(line n[3] as num);
+        global sDmgModel.append(line n[4] as num);
+        global sC.append(vec(line n[5] as num, line n[6] as num, line n[7] as num));
+        global sH.append(vec(line n[8] as num, line n[9] as num, line n[10] as num));
+        global sLocal.append(vec(line n[11] as num, line n[12] as num, line n[13] as num));
+        line sh = [];
+        if (line f[14] as str != "-") {
+            for (line t of (line f[14] as str).split(",")) {
+                line sh.append(num.parse(line t as str));
+            }
+        }
+        global sShield.append(line sh);
+        line rest = [];
+        if (line f[15] as str != "-") {
+            for (line t of (line f[15] as str).split(",")) {
+                line rest.append(num.parse(line t as str));
+            }
+        }
+        global sRest.append(line rest);
+    }
+}
+
+/** Fresh damage state for car c (it must be the newest car, or `slot` the
+ * car being repaired). */
+function carInitDamage(c: num, paint: num, accent: num) {
+    line base = (c - 1) * global gParts;
+    if (global pHp.len() < base + global gParts) {
+        repeat (line i to global gParts) {
+            global pHp.append(0);
+            global pOff.append(0);
+            global pLook.append(0);
+        }
+        global cPaint.append(paint);
+        global cAccent.append(accent);
+        global cPower.append(1);
+        global cGearMax.append(6);
+        global cOverheat.append(0);
+        repeat (line i to 4) {
+            global wDrive.append(1);
+            global wSpringF.append(1);
+            global wGripF.append(1);
+            global wGone.append(0);
+        }
+    }
+    repeat (line i to global gParts) {
+        global pHp[line base + line i] = global sHp[line i];
+        global pOff[line base + line i] = 0;
+        global pLook[line base + line i] = 0;
+    }
+    carEffects(c);
+}
+
+/** HP fraction of part i of car c (0 when broken or off). */
+function partHealth(c: num, i: num): num {
+    line k = (c - 1) * global gParts + i;
+    if (global pOff[line k] == 1) {
+        return 0;
+    }
+    return global pHp[line k] / global sHp[i];
+}
+
+/** Recomputes car c's effect factors from its parts' HP. */
+function carEffects(c: num) {
+    line e = partHealth(c, global iEngine);
+    if (line e <= 0) {
+        global cPower[c] = 0;
+    } else {
+        global cPower[c] = 0.35 + 0.65 * line e;
+    }
+    line g = partHealth(c, global iGearbox);
+    global cGearMax[c] = num.max(0, num.min(6, num.floor(line g * 6 + 0.999)));
+    line front = 1;
+    line rear = 1;
+    if (partHealth(c, global iDiffF) <= 0) {
+        line front = 0;
+    }
+    if (partHealth(c, global iDiffR) <= 0 || partHealth(c, global iDriveshaft) <= 0) {
+        line rear = 0;
+    }
+    global cOverheat[c] = 0;
+    if (partHealth(c, global iRadiator) <= 0) {
+        global cOverheat[c] = 1;
+    }
+    line wheels = [global iWheel1, global iWheel2, global iWheel3, global iWheel4];
+    line ups = [global iUpright1, global iUpright2, global iUpright3, global iUpright4];
+    line arms = [global iArm1, global iArm2, global iArm3, global iArm4];
+    line springs = [global iSpring1, global iSpring2, global iSpring3, global iSpring4];
+    line shafts = [global iHalfshaft1, global iHalfshaft2, global iHalfshaft3, global iHalfshaft4];
+    repeat (line i to 4) {
+        line k = (c - 1) * 4 + line i;
+        line axle = line rear;
+        if (line i <= 2) {
+            line axle = line front;
+        }
+        if (partHealth(c, line shafts[line i] as num) <= 0) {
+            line axle = 0;
+        }
+        global wDrive[line k] = line axle;
+        line s = partHealth(c, line springs[line i] as num);
+        if (line s <= 0) {
+            global wSpringF[line k] = 0.25;
+        } else {
+            global wSpringF[line k] = 0.55 + 0.45 * line s;
+        }
+        line w = partHealth(c, line wheels[line i] as num);
+        global wGripF[line k] = 1;
+        if (line w < 0.5) {
+            global wGripF[line k] = 0.6;
+        }
+        global wGone[line k] = 0;
+        if (line w <= 0 || partHealth(c, line ups[line i] as num) <= 0 || partHealth(c, line arms[line i] as num) <= 0) {
+            global wGone[line k] = 1;
+        }
+    }
+}
+
+/** Takes `amount` HP off part i of car c, swapping in its damaged model or
+ * breaking it as it goes. */
+function partDamage(c: num, i: num, amount: num) {
+    line k = (c - 1) * global gParts + i;
+    if (global pOff[line k] == 1 || amount <= 0) {
+        return;
+    }
+    // Wake a parked car so it settles onto whatever is left.
+    global cAwake[c] = num.max(global cAwake[c], 40);
+    line hp = global pHp[line k] - amount;
+    global pHp[line k] = num.max(0, line hp);
+    if (global pLook[line k] == 0 && global sDmgModel[i] == 1 && line hp < global sHp[i] * 0.6) {
+        global pLook[line k] = 1;
+        showDamaged(c, i);
+    }
+    if (line hp <= 0) {
+        if (global sDetach[i] == 1) {
+            detachPart(c, i);
+        } else {
+            global pOff[line k] = 1;
+            // Glass cracked earlier; a failed engine or diff shows smoke.
+            allPlayers.displayParticleEffect(par("Large Smoke"), partWorld(c, i));
+        }
+    }
+    carEffects(c);
+}
+
+/** The display UUID of part i of car c ("" once it came off). */
+function partEntity(c: num, i: num): str {
+    return (global cAll[c] as list)[i] as str;
+}
+
+/** World location of part i's hitbox center on car c. */
+function partWorld(c: num, i: num): loc {
+    line p = global sC[i] - carCom();
+    line w = global cPos[c] + global cL[c] * line p.x + global cU[c] * line p.y + global cF[c] * line p.z;
+    return loc(line w.x, line w.y, line w.z);
+}
+
+/** Swaps part i of car c to its damaged model. */
+function showDamaged(c: num, i: num) {
+    line look = item("stone").setModel(global sModel[i]).setModelDataNumbers(global cPaint[c], global cAccent[c], type="Colors").setModelDataStrings("damaged");
+    select entitiesByName(partEntity(c, i));
+    selectedEntity.setItemDisplayItem(line look);
+    select reset;
+}
+
+/** Strongest hit of a tick on car c: `at` in the car frame, `speed` the
+ * closing speed (m/s). */
+function impactDamage(c: num, at: vec, speed: num) {
+    line e = speed - 3;
+    if (line e <= 0) {
+        return;
+    }
+    line dmg = line e * line e * 4 + line e * 12;
+    line near = [];
+    repeat (line i to global gParts) {
+        line d = at - global sC[line i];
+        line h = global sH[line i];
+        if (num.abs(line d.x) <= line h.x + 0.35 && num.abs(line d.y) <= line h.y + 0.35 && num.abs(line d.z) <= line h.z + 0.35) {
+            if (global pOff[(c - 1) * global gParts + line i] == 0) {
+                line near.append(line i);
+            }
+        }
+    }
+    for (line v of line near) {
+        line i = line v as num;
+        line covered = 0;
+        for (line s of global sShield[line i] as list) {
+            if (line near.contains(line s)) {
+                line covered = 1;
+            }
+        }
+        if (line covered == 0) {
+            partDamage(c, line i, line dmg);
+        }
+    }
+    partDamage(c, global iChassis, line dmg * 0.15);
+    allPlayers.playSound(snd("Anvil Land", 0.6, num.min(2, line e / 6)), partWorld(c, global iChassis));
+}
+
+/** Breaks part i of car c off with everything it carries; they fly off as
+ * one debris group. */
+function detachPart(c: num, i: num) {
+    line base = (c - 1) * global gParts;
+    // The part and its descendants that are still on.
+    line group = [i];
+    line grew = 1;
+    while (line grew == 1) {
+        line grew = 0;
+        repeat (line j to global gParts) {
+            if (!line group.contains(line j) && line group.contains(global sParent[line j]) && global pOff[line base + line j] == 0) {
+                line group.append(line j);
+                line grew = 1;
+            }
+        }
+    }
+    line L = global cL[c];
+    line U = global cU[c];
+    line F = global cF[c];
+    line center = global sC[i];
+    line ids = [];
+    line mats = [];
+    for (line v of line group) {
+        line j = line v as num;
+        global pOff[line base + line j] = 1;
+        global pHp[line base + line j] = 0;
+        line id = partEntity(c, line j);
+        if (line id == "") {
+            continue;
+        }
+        line ids.append(line id);
+        line rig = global cRigid[c] as list;
+        line rig.removeValue(line id);
+        global cRigid[c] = line rig;
+        line tp = global cTp[c] as list;
+        line tp.removeValue(line id);
+        global cTp[c] = line tp;
+        line move = global cMove[c] as list;
+        line mi = line move.find(line id);
+        if (line mi != 0) {
+            line move[line mi] = "";
+            global cMove[c] = line move;
+        }
+        // Matrix relative to the group center: the rest pose shifted by -center.
+        line r = global sRest[line j] as list;
+        if (line r.len() == 0) {
+            line mats.append([vec(1, 0, 0), vec(0, 1, 0), vec(0, 0, 1), vec(0, 0, 0) - line center]);
+        } else {
+            line mats.append([vec(line r[1] as num, line r[5] as num, line r[9] as num), vec(line r[2] as num, line r[6] as num, line r[10] as num), vec(line r[3] as num, line r[7] as num, line r[11] as num), vec(line r[4] as num, line r[8] as num, line r[12] as num) - line center]);
+        }
+    }
+    if (line ids.len() == 0) {
+        return;
+    }
+    line rl = line center - carCom();
+    line r = L * line rl.x + U * line rl.y + F * line rl.z;
+    line pos = global cPos[c] + line r;
+    line out = vec(line r.x, 0, line r.z);
+    if (line out.len() > 0.05) {
+        line out = line out.setLength(1);
+    }
+    global dCount += 1;
+    global dIds.append(line ids);
+    global dA.append(line mats);
+    global dPos.append(line pos);
+    global dVel.append(global cVel[c] + (global cW[c] as vec).cross(line r) + line out * 2.5 + vec(0, 2.5, 0));
+    global dW.append(vec(num.randomd(-6, 6), num.randomd(-6, 6), num.randomd(-6, 6)));
+    global dL.append(L);
+    global dU.append(U);
+    global dF.append(F);
+    global dRest.append(0);
+    global dCar.append(c);
+    allPlayers.playSound(snd("Item Break", 0.7, 1), loc(line pos.x, line pos.y, line pos.z));
+}
+
+/** Moves every debris group that is not at rest: gravity, tumbling, and a
+ * bouncy landing on blocks. */
+function debrisTick {
+    line dt = 0.05;
+    repeat (line d to global dCount) {
+        if (global dRest[line d] > 10) {
+            continue;
+        }
+        line pos = global dPos[line d];
+        line vel = global dVel[line d] + vec(0, -9.81 * line dt, 0);
+        line w = global dW[line d];
+        line pos = line pos + line vel * line dt;
+        line below = game.getBlockMaterial(loc(line pos.x, line pos.y - 0.15, line pos.z), returnValue="Item");
+        if (line below.isSolid()) {
+            line pos = vec(line pos.x, num.floor(line pos.y - 0.15) + 1.15, line pos.z);
+            line vel = vec(line vel.x * 0.7, num.abs(line vel.y) * 0.25, line vel.z * 0.7);
+            line w = line w * 0.7;
+            if (line vel.len() < 0.6) {
+                global dRest[line d] += 1;
+                line vel = vec(0, 0, 0);
+                line w = vec(0, 0, 0);
+            }
+        }
+        line F = (global dF[line d] + line w.cross(global dF[line d]) * line dt).setLength(1);
+        line U = global dU[line d] + line w.cross(global dU[line d]) * line dt;
+        line L = line U.cross(line F).setLength(1);
+        line U = line F.cross(line L);
+        global dPos[line d] = line pos;
+        global dVel[line d] = line vel;
+        global dW[line d] = line w;
+        global dL[line d] = line L;
+        global dU[line d] = line U;
+        global dF[line d] = line F;
+        select entitiesByName(global dIds[line d] as list[str]);
+        selectedEntity.teleport(loc(line pos.x, line pos.y, line pos.z));
+        select reset;
+        line ids = global dIds[line d] as list;
+        line mats = global dA[line d] as list;
+        repeat (line m to line ids.len()) {
+            line a = line mats[line m] as list;
+            setMover(line ids[line m] as str, line a[1] as vec, line a[2] as vec, line a[3] as vec, line a[4] as vec, line L, line U, line F, 1);
+        }
+    }
+}
+
+/** Removes car c's debris displays (all cars when c is 0) and forgets
+ * their groups. */
+function clearDebris(c: num) {
+    line keep = [];
+    repeat (line d to global dCount) {
+        if (c == 0 || global dCar[line d] == c) {
+            select entitiesByName(global dIds[line d] as list[str]);
+            selectedEntity.remove();
+            select reset;
+        } else {
+            line keep.append(line d);
+        }
+    }
+    line ids = [];
+    line a = [];
+    line pos = [];
+    line vel = [];
+    line w = [];
+    line L = [];
+    line U = [];
+    line F = [];
+    line rest = [];
+    line car = [];
+    for (line v of line keep) {
+        line d = line v as num;
+        line ids.append(global dIds[line d]);
+        line a.append(global dA[line d]);
+        line pos.append(global dPos[line d]);
+        line vel.append(global dVel[line d]);
+        line w.append(global dW[line d]);
+        line L.append(global dL[line d]);
+        line U.append(global dU[line d]);
+        line F.append(global dF[line d]);
+        line rest.append(global dRest[line d]);
+        line car.append(global dCar[line d]);
+    }
+    global dIds = line ids;
+    global dA = line a;
+    global dPos = line pos as list[vec];
+    global dVel = line vel as list[vec];
+    global dW = line w as list[vec];
+    global dL = line L as list[vec];
+    global dU = line U as list[vec];
+    global dF = line F as list[vec];
+    global dRest = line rest as list[num];
+    global dCar = line car as list[num];
+    global dCount = line keep.len();
+}
+
+/** Repairs car c: its debris and displays are replaced by a fresh set, all
+ * HP is restored and it is put back on its wheels. */
+function fixCar(c: num) {
+    clearDebris(c);
+    removeDisplays(global cAll[c] as list);
+    line com = carCom();
+    line o = global cPos[c] - (global cL[c] * line com.x + global cU[c] * line com.y + global cF[c] * line com.z);
+    line sets = spawnDisplays(loc(line o.x, line o.y, line o.z), global cPaint[c], global cAccent[c], "");
+    global cAll[c] = line sets[1];
+    global cRigid[c] = line sets[2];
+    global cMove[c] = line sets[3];
+    global cTp[c] = liveIds(line sets[1] as list);
+    carInitDamage(c, global cPaint[c], global cAccent[c]);
+    carUpright(c);
+    carRender(c);
+}
+
+/** The car player `uuid` drives, else the nearest car within 8 blocks, else 0. */
+function carNear(uuid: str): num {
+    line c = carOf(uuid);
+    if (line c != 0) {
+        return line c;
+    }
+    select playersByName(uuid);
+    line me = selected.location;
+    select reset;
+    line best = 0;
+    line bestD = 8;
+    repeat (line k to global carCount) {
+        if (global cStatic[line k] == 0) {
+            line d = (vec(me.x, me.y, me.z) - global cPos[line k]).len();
+            if (line d < line bestD) {
+                line best = line k;
+                line bestD = line d;
+            }
+        }
+    }
+    return line best;
+}
+
+/** @hit PART AMOUNT: damages a part of your (or the nearest) car. @hit
+ * lists the part ids. */
+function hitCommand(words: list) {
+    line c = carNear(default.uuid);
+    if (line c == 0) {
+        default.sendMessage(s"<gray>No car near you.");
+        return;
+    }
+    if (words.len() < 3) {
+        default.sendMessage(s"<gray>Usage: <yellow>@hit PART AMOUNT</yellow>, e.g. @hit bumper_f 50. Parts are listed in car/PARTS.md.");
+        return;
+    }
+    line want = words[2] as str;
+    line idx = 0;
+    repeat (line i to global gParts) {
+        if (((carPartData()[line i] as str).split(" "))[1] as str == line want) {
+            line idx = line i;
+        }
+    }
+    if (line idx == 0) {
+        default.sendMessage(s"<red>No part %var(want).");
+        return;
+    }
+    partDamage(line c, line idx, num.parse(words[3] as str));
+    line left = num.floor(global pHp[(line c - 1) * global gParts + line idx]);
+    default.sendMessage(s"<gray>%var(want): <white>%var(left)</white> HP left.");
+}
+
+/** @damage: lists the damaged parts of your (or the nearest) car. */
+function damageReport {
+    line c = carNear(default.uuid);
+    if (line c == 0) {
+        default.sendMessage(s"<gray>No car near you.");
+        return;
+    }
+    line parts = [];
+    repeat (line i to global gParts) {
+        line k = (line c - 1) * global gParts + line i;
+        if (global pHp[line k] < global sHp[line i]) {
+            line id = ((carPartData()[line i] as str).split(" "))[1] as str;
+            line pct = num.floor(global pHp[line k] / global sHp[line i] * 100);
+            if (global pOff[line k] == 1 && global sDetach[line i] == 1) {
+                line parts.append("%var(id) off");
+            } else if (global pOff[line k] == 1) {
+                line parts.append("%var(id) broken");
+            } else {
+                line parts.append("%var(id) %var(pct)%");
+            }
+        }
+    }
+    if (line parts.len() == 0) {
+        default.sendMessage(s"<gray>Car %var(c) has no damage.");
+        return;
+    }
+    line text = line parts.join(", ");
+    default.sendMessage(s"<gray>Car %var(c): <white>%var(text)");
+}
