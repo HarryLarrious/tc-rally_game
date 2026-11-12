@@ -1,0 +1,42 @@
+{
+ "model": {
+  "type": "minecraft:model",
+  "model": "rally:item/car/engine",
+  "transformation": {
+   "translation": [
+    -0.5,
+    -0.5,
+    -0.5
+   ],
+   "left_rotation": [
+    0,
+    0,
+    0,
+    1
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "right_rotation": [
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "tints": [
+   {
+    "type": "minecraft:custom_model_data",
+    "index": 0,
+    "default": 14211288
+   },
+   {
+    "type": "minecraft:custom_model_data",
+    "index": 1,
+    "default": 1989288
+   }
+  ]
+ }
+}

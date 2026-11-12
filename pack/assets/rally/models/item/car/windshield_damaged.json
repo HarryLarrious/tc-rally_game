@@ -1,0 +1,86 @@
+{
+ "textures": {
+  "glass_dmg": "rally:item/car/glass_dmg",
+  "particle": "rally:item/car/glass_dmg"
+ },
+ "elements": [
+  {
+   "from": [
+    2.5145,
+    7.8418,
+    5.1565
+   ],
+   "to": [
+    13.3945,
+    8.0018,
+    10.7971
+   ],
+   "rotation": {
+    "origin": [
+     7.9545,
+     7.9218,
+     7.9768
+    ],
+    "x": -33.45,
+    "y": 183.897,
+    "z": -0.575
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  }
+ ]
+}

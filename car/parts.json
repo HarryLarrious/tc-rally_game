@@ -1,0 +1,2255 @@
+{
+ "frame": "+X left, +Y up, +Z forward; meters; origin on the ground between the axles",
+ "model_scale": 0.5,
+ "placement": "item display at the car origin; matrix = car * translate(pivot) * rotate_xyz(rest) * anim. The pack scales the half-size models back to 1:1, so no extra scale is needed.",
+ "anims": {
+  "fixed": "rigid with its parent",
+  "spin_x": "rolls about local X (wheels)",
+  "steer_y": "turns about local Y (front uprights)",
+  "swing_z": "swings about local Z (control arms: suspension travel)",
+  "stretch_y": "aimed between two mount points, scaled along local Y (springs)",
+  "stretch_x": "aimed between two mount points, scaled along local X (half shafts)",
+  "spin_z": "rotates about local Z (steering wheel, drive shaft)"
+ },
+ "tints": {
+  "0": "paint (body color)",
+  "1": "accent (arches, wing, rims, mud flaps)"
+ },
+ "damage_state": "custom_model_data string 0 = \"damaged\" swaps to the _damaged model",
+ "dimensions": {
+  "wheelbase": 2.5,
+  "track": 1.54,
+  "wheel_radius": 0.32,
+  "wheel_width": 0.22,
+  "length": 4.17,
+  "width": 1.86,
+  "height": 1.45
+ },
+ "total_mass": 1108.0,
+ "parts": [
+  {
+   "id": "chassis",
+   "label": "Chassis (floor pan, rails, towers)",
+   "group": "structure",
+   "parent": null,
+   "model": "chassis",
+   "item_model": "rally:car/chassis",
+   "pivot": [
+    0.0,
+    0.615,
+    0.01
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 330,
+   "hp": 400,
+   "on_break": "fail",
+   "effect": "Bent chassis: alignment pull and weaker crash absorption; at 0 the car is wrecked",
+   "shield": [],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.85,
+     -0.335,
+     -1.89
+    ],
+    [
+     0.85,
+     0.335,
+     1.89
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "shell",
+   "label": "Body shell (roof, pillars)",
+   "group": "structure",
+   "parent": "chassis",
+   "model": "shell",
+   "item_model": "rally:car/shell",
+   "pivot": [
+    0.0,
+    1.185,
+    -0.471
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 60,
+   "hp": 220,
+   "on_break": "fail",
+   "effect": "Crushed roof in a rollover: cosmetic, and the cage takes over",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.836,
+     -0.265,
+     -1.465
+    ],
+    [
+     0.836,
+     0.265,
+     1.491
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "cage",
+   "label": "Roll cage, seats, dash",
+   "group": "interior",
+   "parent": "chassis",
+   "model": "cage",
+   "item_model": "rally:car/cage",
+   "pivot": [
+    0.0,
+    0.831,
+    -0.117
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 45,
+   "hp": 300,
+   "on_break": "fail",
+   "effect": "Protects the crew; at 0 HP the roof crush reaches the driver (car is wrecked)",
+   "shield": [],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.68,
+     -0.491,
+     -1.051
+    ],
+    [
+     0.68,
+     0.492,
+     0.997
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "steering_wheel",
+   "label": "Steering wheel",
+   "group": "interior",
+   "parent": "cage",
+   "model": "steering_wheel",
+   "item_model": "rally:car/steering_wheel",
+   "pivot": [
+    0.33,
+    0.95,
+    0.45
+   ],
+   "rest": [
+    22.0,
+    0.0,
+    0.0
+   ],
+   "anim": "spin_z",
+   "mass": 2,
+   "hp": 40,
+   "on_break": "fail",
+   "effect": "Cosmetic; turns with the front wheels",
+   "shield": [],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.184,
+     -0.184,
+     -0.03
+    ],
+    [
+     0.184,
+     0.184,
+     0.25
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "windshield",
+   "label": "Windshield",
+   "group": "glass",
+   "parent": "shell",
+   "model": "windshield",
+   "item_model": "rally:car/windshield",
+   "pivot": [
+    0.0,
+    1.157,
+    0.635
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 12,
+   "hp": 30,
+   "on_break": "fail",
+   "effect": "Cracks, then shatters (stays in the frame as a cracked model)",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.68,
+     -0.215,
+     -0.291
+    ],
+    [
+     0.68,
+     0.216,
+     0.291
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "rear_window",
+   "label": "Rear window",
+   "group": "glass",
+   "parent": "hatch",
+   "model": "rear_window",
+   "item_model": "rally:car/rear_window",
+   "pivot": [
+    0.0,
+    1.192,
+    -1.5
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 6,
+   "hp": 20,
+   "on_break": "fail",
+   "effect": "Cracks, then shatters",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.65,
+     -0.181,
+     -0.384
+    ],
+    [
+     0.65,
+     0.182,
+     0.384
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "door_l",
+   "label": "Door (left)",
+   "group": "body",
+   "parent": "shell",
+   "model": "door_l",
+   "item_model": "rally:car/door_l",
+   "pivot": [
+    0.83,
+    0.8,
+    0.86
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 18,
+   "hp": 90,
+   "on_break": "detach",
+   "effect": "Falls off; the side glass goes with it",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.07,
+     -0.35,
+     -1.11
+    ],
+    [
+     0.045,
+     0.556,
+     0.042
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mirror_l",
+   "label": "Mirror (left)",
+   "group": "body",
+   "parent": "door_l",
+   "model": "mirror_l",
+   "item_model": "rally:car/mirror_l",
+   "pivot": [
+    0.9,
+    1.02,
+    0.76
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1.5,
+   "hp": 15,
+   "on_break": "detach",
+   "effect": "Falls off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.04,
+     -0.03,
+     -0.065
+    ],
+    [
+     0.12,
+     0.08,
+     0.04
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "door_r",
+   "label": "Door (right)",
+   "group": "body",
+   "parent": "shell",
+   "model": "door_r",
+   "item_model": "rally:car/door_r",
+   "pivot": [
+    -0.83,
+    0.8,
+    0.86
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 18,
+   "hp": 90,
+   "on_break": "detach",
+   "effect": "Falls off; the side glass goes with it",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.045,
+     -0.35,
+     -1.11
+    ],
+    [
+     0.07,
+     0.556,
+     0.042
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mirror_r",
+   "label": "Mirror (right)",
+   "group": "body",
+   "parent": "door_r",
+   "model": "mirror_r",
+   "item_model": "rally:car/mirror_r",
+   "pivot": [
+    -0.9,
+    1.02,
+    0.76
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1.5,
+   "hp": 15,
+   "on_break": "detach",
+   "effect": "Falls off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.12,
+     -0.03,
+     -0.065
+    ],
+    [
+     0.04,
+     0.08,
+     0.04
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "fender_fl",
+   "label": "Front fender (left)",
+   "group": "body",
+   "parent": "chassis",
+   "model": "fender_fl",
+   "item_model": "rally:car/fender_fl",
+   "pivot": [
+    0.68,
+    0.642,
+    1.376
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Falls off with its headlight; that side loses its low beam",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.24,
+     -0.329,
+     -0.585
+    ],
+    [
+     0.24,
+     0.258,
+     0.63
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "fender_fr",
+   "label": "Front fender (right)",
+   "group": "body",
+   "parent": "chassis",
+   "model": "fender_fr",
+   "item_model": "rally:car/fender_fr",
+   "pivot": [
+    -0.68,
+    0.642,
+    1.376
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Falls off with its headlight; that side loses its low beam",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.24,
+     -0.329,
+     -0.585
+    ],
+    [
+     0.24,
+     0.258,
+     0.63
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "quarter_rl",
+   "label": "Rear quarter panel (left)",
+   "group": "body",
+   "parent": "chassis",
+   "model": "quarter_rl",
+   "item_model": "rally:car/quarter_rl",
+   "pivot": [
+    0.69,
+    0.692,
+    -1.118
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 9,
+   "hp": 80,
+   "on_break": "detach",
+   "effect": "Falls off with its tail light",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.24,
+     -0.379,
+     -0.867
+    ],
+    [
+     0.24,
+     0.308,
+     0.868
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "quarter_rr",
+   "label": "Rear quarter panel (right)",
+   "group": "body",
+   "parent": "chassis",
+   "model": "quarter_rr",
+   "item_model": "rally:car/quarter_rr",
+   "pivot": [
+    -0.69,
+    0.692,
+    -1.118
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 9,
+   "hp": 80,
+   "on_break": "detach",
+   "effect": "Falls off with its tail light",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.24,
+     -0.379,
+     -0.867
+    ],
+    [
+     0.24,
+     0.308,
+     0.868
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mudflap_fl",
+   "label": "Mud flap (FL)",
+   "group": "body",
+   "parent": "fender_fl",
+   "model": "mudflap_fl",
+   "item_model": "rally:car/mudflap_fl",
+   "pivot": [
+    0.77,
+    0.5,
+    0.8
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1,
+   "hp": 10,
+   "on_break": "detach",
+   "effect": "Torn off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.11,
+     -0.4,
+     -0.01
+    ],
+    [
+     0.11,
+     0.0,
+     0.01
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mudflap_rl",
+   "label": "Mud flap (RL)",
+   "group": "body",
+   "parent": "quarter_rl",
+   "model": "mudflap_rl",
+   "item_model": "rally:car/mudflap_rl",
+   "pivot": [
+    0.77,
+    0.5,
+    -1.7
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1,
+   "hp": 10,
+   "on_break": "detach",
+   "effect": "Torn off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.11,
+     -0.4,
+     -0.01
+    ],
+    [
+     0.11,
+     0.0,
+     0.01
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mudflap_fr",
+   "label": "Mud flap (FR)",
+   "group": "body",
+   "parent": "fender_fr",
+   "model": "mudflap_fr",
+   "item_model": "rally:car/mudflap_fr",
+   "pivot": [
+    -0.77,
+    0.5,
+    0.8
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1,
+   "hp": 10,
+   "on_break": "detach",
+   "effect": "Torn off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.11,
+     -0.4,
+     -0.01
+    ],
+    [
+     0.11,
+     0.0,
+     0.01
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "mudflap_rr",
+   "label": "Mud flap (RR)",
+   "group": "body",
+   "parent": "quarter_rr",
+   "model": "mudflap_rr",
+   "item_model": "rally:car/mudflap_rr",
+   "pivot": [
+    -0.77,
+    0.5,
+    -1.7
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 1,
+   "hp": 10,
+   "on_break": "detach",
+   "effect": "Torn off",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.11,
+     -0.4,
+     -0.01
+    ],
+    [
+     0.11,
+     0.0,
+     0.01
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "hood",
+   "label": "Hood",
+   "group": "body",
+   "parent": "chassis",
+   "model": "hood",
+   "item_model": "rally:car/hood",
+   "pivot": [
+    0.0,
+    0.95,
+    1.02
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 10,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Flies off; the engine is exposed and takes hits directly",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.62,
+     -0.146,
+     -0.028
+    ],
+    [
+     0.62,
+     0.03,
+     0.948
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "lightpod",
+   "label": "Light pod (4 lamps)",
+   "group": "body",
+   "parent": "hood",
+   "model": "lightpod",
+   "item_model": "rally:car/lightpod",
+   "pivot": [
+    0.0,
+    0.944,
+    1.932
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 8,
+   "hp": 30,
+   "on_break": "detach",
+   "effect": "Falls off: no long-range lights for night stages",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.52,
+     -0.084,
+     -0.072
+    ],
+    [
+     0.52,
+     0.083,
+     0.071
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "bumper_f",
+   "label": "Front bumper",
+   "group": "body",
+   "parent": "chassis",
+   "model": "bumper_f",
+   "item_model": "rally:car/bumper_f",
+   "pivot": [
+    0.0,
+    0.53,
+    1.99
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 7,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Absorbs front hits first; once gone the radiator takes them",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.86,
+     -0.27,
+     -0.13
+    ],
+    [
+     0.86,
+     0.27,
+     0.13
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "bumper_r",
+   "label": "Rear bumper",
+   "group": "body",
+   "parent": "chassis",
+   "model": "bumper_r",
+   "item_model": "rally:car/bumper_r",
+   "pivot": [
+    0.0,
+    0.405,
+    -1.99
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 6,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Absorbs rear hits first; once gone the fuel cell and exhaust take them",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.86,
+     -0.145,
+     -0.09
+    ],
+    [
+     0.86,
+     0.145,
+     0.09
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "hatch",
+   "label": "Rear hatch",
+   "group": "body",
+   "parent": "chassis",
+   "model": "hatch",
+   "item_model": "rally:car/hatch",
+   "pivot": [
+    0.0,
+    1.38,
+    -1.1
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 9,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Falls off with the rear window and wing",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.7,
+     -0.83,
+     -0.885
+    ],
+    [
+     0.7,
+     0.01,
+     0.02
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "wing",
+   "label": "Rear wing",
+   "group": "body",
+   "parent": "hatch",
+   "model": "wing",
+   "item_model": "rally:car/wing",
+   "pivot": [
+    0.0,
+    1.143,
+    -1.945
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 6,
+   "hp": 40,
+   "on_break": "detach",
+   "effect": "Falls off: less rear downforce, the tail gets loose at speed",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.812,
+     -0.149,
+     -0.155
+    ],
+    [
+     0.812,
+     0.097,
+     0.156
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "engine",
+   "label": "Engine (2.0 turbo inline-4)",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "engine",
+   "item_model": "rally:car/engine",
+   "pivot": [
+    -0.035,
+    0.58,
+    1.505
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 145,
+   "hp": 160,
+   "on_break": "fail",
+   "effect": "Power drops with HP; at 0 it seizes. Overheats if the radiator leaks",
+   "shield": [
+    "hood",
+    "radiator",
+    "bumper_f"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.355,
+     -0.25,
+     -0.305
+    ],
+    [
+     0.355,
+     0.25,
+     0.305
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "gearbox",
+   "label": "Gearbox (6-speed sequential)",
+   "group": "powertrain",
+   "parent": "engine",
+   "model": "gearbox",
+   "item_model": "rally:car/gearbox",
+   "pivot": [
+    0.0,
+    0.512,
+    0.92
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 60,
+   "hp": 140,
+   "on_break": "fail",
+   "effect": "Damage drops gears: at low HP it jumps out of the top gears; at 0 no drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.18,
+     -0.189,
+     -0.28
+    ],
+    [
+     0.18,
+     0.188,
+     0.28
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "radiator",
+   "label": "Radiator",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "radiator",
+   "item_model": "rally:car/radiator",
+   "pivot": [
+    0.0,
+    0.573,
+    1.776
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 8,
+   "hp": 40,
+   "on_break": "fail",
+   "effect": "Leaks: the engine heats up; overheated, it loses HP over time",
+   "shield": [
+    "bumper_f"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.43,
+     -0.213,
+     -0.083
+    ],
+    [
+     0.43,
+     0.249,
+     0.094
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "driveshaft",
+   "label": "Center drive shaft",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "driveshaft",
+   "item_model": "rally:car/driveshaft",
+   "pivot": [
+    0.0,
+    0.36,
+    -0.23
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "spin_z",
+   "mass": 12,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Snaps (bottoming out): the rear axle loses drive, the car is front-drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.051,
+     -0.051,
+     -0.87
+    ],
+    [
+     0.051,
+     0.051,
+     0.87
+    ]
+   ],
+   "links": {
+    "front": [
+     0,
+     0.36,
+     0.64
+    ],
+    "rear": [
+     0,
+     0.36,
+     -1.1
+    ]
+   }
+  },
+  {
+   "id": "diff_f",
+   "label": "Front differential",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "diff_f",
+   "item_model": "rally:car/diff_f",
+   "pivot": [
+    0.0,
+    0.31,
+    1.228
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 25,
+   "hp": 110,
+   "on_break": "fail",
+   "effect": "Breaks: the front axle loses drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.14,
+     -0.106,
+     -0.123
+    ],
+    [
+     0.14,
+     0.106,
+     0.122
+    ]
+   ],
+   "links": {
+    "out_l": [
+     0.13,
+     0.31,
+     1.25
+    ],
+    "out_r": [
+     -0.13,
+     0.31,
+     1.25
+    ]
+   }
+  },
+  {
+   "id": "diff_r",
+   "label": "Rear differential",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "diff_r",
+   "item_model": "rally:car/diff_r",
+   "pivot": [
+    0.0,
+    0.31,
+    -1.228
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 30,
+   "hp": 110,
+   "on_break": "fail",
+   "effect": "Breaks: the rear axle loses drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.14,
+     -0.106,
+     -0.122
+    ],
+    [
+     0.14,
+     0.106,
+     0.123
+    ]
+   ],
+   "links": {
+    "out_l": [
+     0.13,
+     0.31,
+     -1.25
+    ],
+    "out_r": [
+     -0.13,
+     0.31,
+     -1.25
+    ]
+   }
+  },
+  {
+   "id": "fuel_tank",
+   "label": "Fuel cell",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "fuel_tank",
+   "item_model": "rally:car/fuel_tank",
+   "pivot": [
+    0.0,
+    0.65,
+    -1.59
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 50,
+   "hp": 80,
+   "on_break": "fail",
+   "effect": "Leaks fuel; at 0 it catches fire",
+   "shield": [
+    "bumper_r",
+    "hatch"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.42,
+     -0.15,
+     -0.23
+    ],
+    [
+     0.42,
+     0.15,
+     0.23
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "exhaust",
+   "label": "Exhaust and silencer",
+   "group": "powertrain",
+   "parent": "chassis",
+   "model": "exhaust",
+   "item_model": "rally:car/exhaust",
+   "pivot": [
+    -0.3,
+    0.355,
+    -0.323
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 18,
+   "hp": 50,
+   "on_break": "detach",
+   "effect": "Torn off: louder, a little less power",
+   "shield": [
+    "bumper_r"
+   ],
+   "damaged_model": false,
+   "hitbox": [
+    [
+     -0.15,
+     -0.155,
+     -1.717
+    ],
+    [
+     0.15,
+     0.219,
+     1.715
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "arm_fl",
+   "label": "Control arm (front left)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "arm",
+   "item_model": "rally:car/arm",
+   "pivot": [
+    0.3,
+    0.24,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "swing_z",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Bends (toe and camber pull to one side); broken, the wheel and upright come off",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.02,
+     -0.06,
+     -0.2
+    ],
+    [
+     0.368,
+     0.02,
+     0.2
+    ]
+   ],
+   "links": {
+    "ball_joint": [
+     0.34,
+     -0.03999999999999998,
+     0.0
+    ],
+    "spring_mount": [
+     0.22,
+     -0.0259,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "upright_fl",
+   "label": "Upright and brake (front left)",
+   "group": "suspension",
+   "parent": "arm_fl",
+   "model": "upright",
+   "item_model": "rally:car/upright",
+   "pivot": [
+    0.77,
+    0.32,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "steer_y",
+   "mass": 12,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Brake fades with damage; broken, the wheel comes off",
+   "shield": [
+    "wheel_fl"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.16,
+     -0.15,
+     -0.146
+    ],
+    [
+     -0.02,
+     0.17,
+     0.16
+    ]
+   ],
+   "links": {
+    "halfshaft": [
+     -0.14,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "spring_fl",
+   "label": "Coilover spring and damper (front left)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "spring",
+   "item_model": "rally:car/spring",
+   "pivot": [
+    0.52,
+    0.2141,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    -3.777
+   ],
+   "anim": "stretch_y",
+   "mass": 6,
+   "hp": 50,
+   "on_break": "fail",
+   "effect": "Weakens: that corner sags and bounces; broken, it bottoms out",
+   "shield": [
+    "wheel_fl"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.075,
+     0.01,
+     -0.071
+    ],
+    [
+     0.075,
+     0.6,
+     0.071
+    ]
+   ],
+   "links": {
+    "bottom": [
+     0.52,
+     0.2141,
+     1.25
+    ],
+    "top": [
+     0.56,
+     0.82,
+     1.25
+    ],
+    "rest_length": 0.6072
+   }
+  },
+  {
+   "id": "halfshaft_fl",
+   "label": "Half shaft (front left)",
+   "group": "powertrain",
+   "parent": "diff_f",
+   "model": "halfshaft",
+   "item_model": "rally:car/halfshaft",
+   "pivot": [
+    0.145,
+    0.31,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "stretch_x",
+   "mass": 6,
+   "hp": 45,
+   "on_break": "fail",
+   "effect": "Snaps: this wheel gets no drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     0.0,
+     -0.042,
+     -0.042
+    ],
+    [
+     0.485,
+     0.042,
+     0.042
+    ]
+   ],
+   "links": {
+    "inner": [
+     0.145,
+     0.31,
+     1.25
+    ],
+    "outer": [
+     0.63,
+     0.32,
+     1.25
+    ],
+    "rest_length": 0.485
+   }
+  },
+  {
+   "id": "wheel_fl",
+   "label": "Wheel and tire (front left)",
+   "group": "wheel",
+   "parent": "upright_fl",
+   "model": "wheel",
+   "item_model": "rally:car/wheel",
+   "pivot": [
+    0.77,
+    0.32,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "spin_x",
+   "mass": 18,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Punctures: less grip and a lower ride; broken, it comes off and rolls away",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.118,
+     -0.316,
+     -0.316
+    ],
+    [
+     0.135,
+     0.316,
+     0.316
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "arm_fr",
+   "label": "Control arm (front right)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "arm",
+   "item_model": "rally:car/arm",
+   "pivot": [
+    -0.3,
+    0.24,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "swing_z",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Bends (toe and camber pull to one side); broken, the wheel and upright come off",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.02,
+     -0.06,
+     -0.2
+    ],
+    [
+     0.368,
+     0.02,
+     0.2
+    ]
+   ],
+   "links": {
+    "ball_joint": [
+     0.34,
+     -0.03999999999999998,
+     0.0
+    ],
+    "spring_mount": [
+     0.22,
+     -0.0259,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "upright_fr",
+   "label": "Upright and brake (front right)",
+   "group": "suspension",
+   "parent": "arm_fr",
+   "model": "upright",
+   "item_model": "rally:car/upright",
+   "pivot": [
+    -0.77,
+    0.32,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "steer_y",
+   "mass": 12,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Brake fades with damage; broken, the wheel comes off",
+   "shield": [
+    "wheel_fr"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.16,
+     -0.15,
+     -0.146
+    ],
+    [
+     -0.02,
+     0.17,
+     0.16
+    ]
+   ],
+   "links": {
+    "halfshaft": [
+     -0.14,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "spring_fr",
+   "label": "Coilover spring and damper (front right)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "spring",
+   "item_model": "rally:car/spring",
+   "pivot": [
+    -0.52,
+    0.2141,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    3.777
+   ],
+   "anim": "stretch_y",
+   "mass": 6,
+   "hp": 50,
+   "on_break": "fail",
+   "effect": "Weakens: that corner sags and bounces; broken, it bottoms out",
+   "shield": [
+    "wheel_fr"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.075,
+     0.01,
+     -0.071
+    ],
+    [
+     0.075,
+     0.6,
+     0.071
+    ]
+   ],
+   "links": {
+    "bottom": [
+     -0.52,
+     0.2141,
+     1.25
+    ],
+    "top": [
+     -0.56,
+     0.82,
+     1.25
+    ],
+    "rest_length": 0.6072
+   }
+  },
+  {
+   "id": "halfshaft_fr",
+   "label": "Half shaft (front right)",
+   "group": "powertrain",
+   "parent": "diff_f",
+   "model": "halfshaft",
+   "item_model": "rally:car/halfshaft",
+   "pivot": [
+    -0.145,
+    0.31,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "stretch_x",
+   "mass": 6,
+   "hp": 45,
+   "on_break": "fail",
+   "effect": "Snaps: this wheel gets no drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     0.0,
+     -0.042,
+     -0.042
+    ],
+    [
+     0.485,
+     0.042,
+     0.042
+    ]
+   ],
+   "links": {
+    "inner": [
+     -0.145,
+     0.31,
+     1.25
+    ],
+    "outer": [
+     -0.63,
+     0.32,
+     1.25
+    ],
+    "rest_length": 0.485
+   }
+  },
+  {
+   "id": "wheel_fr",
+   "label": "Wheel and tire (front right)",
+   "group": "wheel",
+   "parent": "upright_fr",
+   "model": "wheel",
+   "item_model": "rally:car/wheel",
+   "pivot": [
+    -0.77,
+    0.32,
+    1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "spin_x",
+   "mass": 18,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Punctures: less grip and a lower ride; broken, it comes off and rolls away",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.118,
+     -0.316,
+     -0.316
+    ],
+    [
+     0.135,
+     0.316,
+     0.316
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "arm_rl",
+   "label": "Control arm (rear left)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "arm",
+   "item_model": "rally:car/arm",
+   "pivot": [
+    0.3,
+    0.24,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "swing_z",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Bends (toe and camber pull to one side); broken, the wheel and upright come off",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.02,
+     -0.06,
+     -0.2
+    ],
+    [
+     0.368,
+     0.02,
+     0.2
+    ]
+   ],
+   "links": {
+    "ball_joint": [
+     0.34,
+     -0.03999999999999998,
+     0.0
+    ],
+    "spring_mount": [
+     0.22,
+     -0.0259,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "upright_rl",
+   "label": "Upright and brake (rear left)",
+   "group": "suspension",
+   "parent": "arm_rl",
+   "model": "upright",
+   "item_model": "rally:car/upright",
+   "pivot": [
+    0.77,
+    0.32,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 12,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Brake fades with damage; broken, the wheel comes off",
+   "shield": [
+    "wheel_rl"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.16,
+     -0.15,
+     -0.146
+    ],
+    [
+     -0.02,
+     0.17,
+     0.16
+    ]
+   ],
+   "links": {
+    "halfshaft": [
+     -0.14,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "spring_rl",
+   "label": "Coilover spring and damper (rear left)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "spring",
+   "item_model": "rally:car/spring",
+   "pivot": [
+    0.52,
+    0.2141,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    -3.777
+   ],
+   "anim": "stretch_y",
+   "mass": 6,
+   "hp": 50,
+   "on_break": "fail",
+   "effect": "Weakens: that corner sags and bounces; broken, it bottoms out",
+   "shield": [
+    "wheel_rl"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.075,
+     0.01,
+     -0.071
+    ],
+    [
+     0.075,
+     0.6,
+     0.071
+    ]
+   ],
+   "links": {
+    "bottom": [
+     0.52,
+     0.2141,
+     -1.25
+    ],
+    "top": [
+     0.56,
+     0.82,
+     -1.25
+    ],
+    "rest_length": 0.6072
+   }
+  },
+  {
+   "id": "halfshaft_rl",
+   "label": "Half shaft (rear left)",
+   "group": "powertrain",
+   "parent": "diff_r",
+   "model": "halfshaft",
+   "item_model": "rally:car/halfshaft",
+   "pivot": [
+    0.145,
+    0.31,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "stretch_x",
+   "mass": 6,
+   "hp": 45,
+   "on_break": "fail",
+   "effect": "Snaps: this wheel gets no drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     0.0,
+     -0.042,
+     -0.042
+    ],
+    [
+     0.485,
+     0.042,
+     0.042
+    ]
+   ],
+   "links": {
+    "inner": [
+     0.145,
+     0.31,
+     -1.25
+    ],
+    "outer": [
+     0.63,
+     0.32,
+     -1.25
+    ],
+    "rest_length": 0.485
+   }
+  },
+  {
+   "id": "wheel_rl",
+   "label": "Wheel and tire (rear left)",
+   "group": "wheel",
+   "parent": "upright_rl",
+   "model": "wheel",
+   "item_model": "rally:car/wheel",
+   "pivot": [
+    0.77,
+    0.32,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "anim": "spin_x",
+   "mass": 18,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Punctures: less grip and a lower ride; broken, it comes off and rolls away",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.118,
+     -0.316,
+     -0.316
+    ],
+    [
+     0.135,
+     0.316,
+     0.316
+    ]
+   ],
+   "links": {}
+  },
+  {
+   "id": "arm_rr",
+   "label": "Control arm (rear right)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "arm",
+   "item_model": "rally:car/arm",
+   "pivot": [
+    -0.3,
+    0.24,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "swing_z",
+   "mass": 5,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Bends (toe and camber pull to one side); broken, the wheel and upright come off",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.02,
+     -0.06,
+     -0.2
+    ],
+    [
+     0.368,
+     0.02,
+     0.2
+    ]
+   ],
+   "links": {
+    "ball_joint": [
+     0.34,
+     -0.03999999999999998,
+     0.0
+    ],
+    "spring_mount": [
+     0.22,
+     -0.0259,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "upright_rr",
+   "label": "Upright and brake (rear right)",
+   "group": "suspension",
+   "parent": "arm_rr",
+   "model": "upright",
+   "item_model": "rally:car/upright",
+   "pivot": [
+    -0.77,
+    0.32,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "fixed",
+   "mass": 12,
+   "hp": 70,
+   "on_break": "detach",
+   "effect": "Brake fades with damage; broken, the wheel comes off",
+   "shield": [
+    "wheel_rr"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.16,
+     -0.15,
+     -0.146
+    ],
+    [
+     -0.02,
+     0.17,
+     0.16
+    ]
+   ],
+   "links": {
+    "halfshaft": [
+     -0.14,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "id": "spring_rr",
+   "label": "Coilover spring and damper (rear right)",
+   "group": "suspension",
+   "parent": "chassis",
+   "model": "spring",
+   "item_model": "rally:car/spring",
+   "pivot": [
+    -0.52,
+    0.2141,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    0.0,
+    3.777
+   ],
+   "anim": "stretch_y",
+   "mass": 6,
+   "hp": 50,
+   "on_break": "fail",
+   "effect": "Weakens: that corner sags and bounces; broken, it bottoms out",
+   "shield": [
+    "wheel_rr"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.075,
+     0.01,
+     -0.071
+    ],
+    [
+     0.075,
+     0.6,
+     0.071
+    ]
+   ],
+   "links": {
+    "bottom": [
+     -0.52,
+     0.2141,
+     -1.25
+    ],
+    "top": [
+     -0.56,
+     0.82,
+     -1.25
+    ],
+    "rest_length": 0.6072
+   }
+  },
+  {
+   "id": "halfshaft_rr",
+   "label": "Half shaft (rear right)",
+   "group": "powertrain",
+   "parent": "diff_r",
+   "model": "halfshaft",
+   "item_model": "rally:car/halfshaft",
+   "pivot": [
+    -0.145,
+    0.31,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "stretch_x",
+   "mass": 6,
+   "hp": 45,
+   "on_break": "fail",
+   "effect": "Snaps: this wheel gets no drive",
+   "shield": [
+    "chassis"
+   ],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     0.0,
+     -0.042,
+     -0.042
+    ],
+    [
+     0.485,
+     0.042,
+     0.042
+    ]
+   ],
+   "links": {
+    "inner": [
+     -0.145,
+     0.31,
+     -1.25
+    ],
+    "outer": [
+     -0.63,
+     0.32,
+     -1.25
+    ],
+    "rest_length": 0.485
+   }
+  },
+  {
+   "id": "wheel_rr",
+   "label": "Wheel and tire (rear right)",
+   "group": "wheel",
+   "parent": "upright_rr",
+   "model": "wheel",
+   "item_model": "rally:car/wheel",
+   "pivot": [
+    -0.77,
+    0.32,
+    -1.25
+   ],
+   "rest": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "anim": "spin_x",
+   "mass": 18,
+   "hp": 60,
+   "on_break": "detach",
+   "effect": "Punctures: less grip and a lower ride; broken, it comes off and rolls away",
+   "shield": [],
+   "damaged_model": true,
+   "hitbox": [
+    [
+     -0.118,
+     -0.316,
+     -0.316
+    ],
+    [
+     0.135,
+     0.316,
+     0.316
+    ]
+   ],
+   "links": {}
+  }
+ ]
+}

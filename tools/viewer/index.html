@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rally Car Parts</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --line:#2c3038; --text:#e6e8ec; --dim:#8b93a1; --hi:#f0b429; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui, sans-serif; display:flex; height:100vh; overflow:hidden; }
+  #view { flex:1; position:relative; }
+  canvas { display:block; }
+  #side { width:320px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
+  #controls { padding:12px; border-bottom:1px solid var(--line); display:grid; gap:8px; }
+  #controls label { display:flex; align-items:center; gap:8px; }
+  #controls input[type=range] { flex:1; }
+  #list { overflow:auto; flex:1; padding:6px 0; }
+  .grp { padding:8px 12px 2px; color:var(--dim); text-transform:uppercase; font-size:11px; letter-spacing:.06em; }
+  .row { display:flex; align-items:center; gap:8px; padding:3px 12px; cursor:pointer; }
+  .row:hover, .row.sel { background:#272b33; }
+  .row.off { color:var(--dim); text-decoration:line-through; }
+  .row .m { margin-left:auto; color:var(--dim); font-variant-numeric:tabular-nums; }
+  #info { padding:12px; border-top:1px solid var(--line); min-height:120px; }
+  #info b { color:var(--hi); }
+  #hud { position:absolute; left:12px; top:10px; color:var(--dim); pointer-events:none; }
+  button { background:#2a2e36; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 8px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="view"><div id="hud">Drag to orbit, scroll to zoom. Click a part to select it, double-click to break it off.</div></div>
+<div id="side">
+  <div id="controls">
+    <label>Explode <input id="explode" type="range" min="0" max="1" step="0.01" value="0"></label>
+    <label><input id="damaged" type="checkbox"> Damaged models</label>
+    <label><input id="xray" type="checkbox"> Ghost body (see mechanics)</label>
+    <label>Paint <input id="paint" type="color" value="#d8d8d8"> Accent <input id="accent" type="color" value="#1e5aa8"></label>
+    <div><button id="reset">Reattach all</button> <button data-v="front">Front</button> <button data-v="side">Side</button> <button data-v="rear">Rear</button> <button data-v="top">Top</button> <button data-v="under">Under</button></div>
+  </div>
+  <div id="list"></div>
+  <div id="info">Select a part.</div>
+</div>
+<script src="car_data.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const CAR = window.CAR, spec = CAR.spec;
+const view = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14161a);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 100);
+camera.position.set(6.5, 3.4, 6.5);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.6, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(3, 6, 4); scene.add(sun);
+const grid = new THREE.GridHelper(10, 10, 0x3a3f48, 0x262a31); scene.add(grid);
+
+// textures
+const loader = new THREE.TextureLoader();
+const tex = {};
+for (const [k, v] of Object.entries(CAR.textures)) {
+  const t = loader.load(v); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace; tex[k] = t;
+}
+const tints = [new THREE.Color("#d8d8d8"), new THREE.Color("#1e5aa8")];
+const matCache = new Map();
+const allMats = [];
+function material(texName, tint, emit) {
+  const key = texName + "|" + tint + "|" + emit;
+  if (matCache.has(key)) return matCache.get(key);
+  const glass = texName.startsWith("glass");
+  const m = new THREE.MeshLambertMaterial({ map: tex[texName], transparent: glass, depthWrite: !glass,
+    side: glass ? THREE.DoubleSide : THREE.FrontSide, alphaTest: glass ? 0 : 0.1 });
+  if (emit) { m.emissive = new THREE.Color(0xffffff); m.emissiveMap = tex[texName]; m.emissiveIntensity = 0.8; }
+  m.userData = { tint, glass };
+  if (tint !== undefined) m.color = tints[tint];
+  matCache.set(key, m); allMats.push(m);
+  return m;
+}
+// three BoxGeometry group order: +x, -x, +y, -y, +z, -z
+const FACE_ORDER = ["east", "west", "up", "down", "south", "north"];
+const S = 1 / (16 * spec.model_scale); // model units -> meters
+function buildModel(model) {
+  const g = new THREE.Group();
+  for (const el of model.elements) {
+    const size = [0, 1, 2].map(i => Math.max((el.to[i] - el.from[i]) * S, 0.0005));
+    const geo = new THREE.BoxGeometry(...size);
+    const mats = FACE_ORDER.map(f => {
+      const face = el.faces[f];
+      if (!face) return new THREE.MeshBasicMaterial({ visible: false });
+      return material(face.texture.slice(1), face.tintindex, el.light_emission);
+    });
+    const mesh = new THREE.Mesh(geo, mats);
+    const c = [0, 1, 2].map(i => ((el.from[i] + el.to[i]) / 2 - 8) * S);
+    if (el.rotation) {
+      const o = el.rotation.origin.map(v => (v - 8) * S);
+      const piv = new THREE.Group(); piv.position.set(...o);
+      const r = el.rotation;
+      const rx = (r.x ?? (r.axis === "x" ? r.angle : 0)) * Math.PI / 180;
+      const ry = (r.y ?? (r.axis === "y" ? r.angle : 0)) * Math.PI / 180;
+      const rz = (r.z ?? (r.axis === "z" ? r.angle : 0)) * Math.PI / 180;
+      piv.rotation.set(rx, ry, rz, "ZYX"); // three "ZYX" = Rz*Ry*Rx, same as Minecraft rotationZYX
+      mesh.position.set(c[0] - o[0], c[1] - o[1], c[2] - o[2]);
+      piv.add(mesh); g.add(piv);
+    } else { mesh.position.set(...c); g.add(mesh); }
+  }
+  return g;
+}
+
+// parts
+const parts = {};
+const root = new THREE.Group(); scene.add(root);
+const center = new THREE.Vector3(0, 0.6, 0);
+for (const p of spec.parts) {
+  const holder = new THREE.Group();
+  holder.position.set(...p.pivot);
+  holder.rotation.set(...p.rest.map(d => d * Math.PI / 180), "ZYX");
+  const intact = buildModel(CAR.models[p.model]);
+  const dmg = p.damaged_model ? buildModel(CAR.models[p.model + "_damaged"]) : null;
+  holder.add(intact); if (dmg) { dmg.visible = false; holder.add(dmg); }
+  holder.traverse(o => { if (o.isMesh) o.userData.part = p.id; });
+  root.add(holder);
+  const hb = p.hitbox;
+  const local = new THREE.Vector3((hb[0][0] + hb[1][0]) / 2, (hb[0][1] + hb[1][1]) / 2, (hb[0][2] + hb[1][2]) / 2);
+  const worldC = local.clone().applyEuler(holder.rotation).add(holder.position);
+  parts[p.id] = { p, holder, intact, dmg, home: holder.position.clone(), dir: worldC.clone().sub(center), broken: false, vel: null };
+}
+
+// explode direction: away from the center, mechanics pulled downward, glass outward
+for (const k in parts) {
+  const P = parts[k], d = P.dir;
+  if (["powertrain", "suspension"].includes(P.p.group)) d.y -= 0.6;
+  if (P.p.group === "wheel") d.x *= 1.6;
+  if (P.p.group === "interior") d.y += 0.9;
+  if (P.p.group === "structure" && P.p.id !== "chassis") d.y += 1.4;
+}
+
+// ui list
+const list = document.getElementById("list");
+const groups = {};
+for (const p of spec.parts) (groups[p.group] ??= []).push(p);
+const rows = {};
+for (const [g, ps] of Object.entries(groups)) {
+  const h = document.createElement("div"); h.className = "grp"; h.textContent = g; list.appendChild(h);
+  for (const p of ps) {
+    const r = document.createElement("div"); r.className = "row";
+    r.innerHTML = `<span>${p.label}</span><span class="m">${p.mass} kg</span>`;
+    r.onclick = () => select(p.id); r.ondblclick = () => toggleBreak(p.id);
+    list.appendChild(r); rows[p.id] = r;
+  }
+}
+const info = document.getElementById("info");
+let selected = null;
+const selBox = new THREE.Box3Helper(new THREE.Box3(), 0xf0b429); scene.add(selBox); selBox.visible = false;
+function select(id) {
+  if (selected) rows[selected].classList.remove("sel");
+  selected = id; rows[id].classList.add("sel"); rows[id].scrollIntoView({ block: "nearest" });
+  const p = parts[id].p;
+  const kids = spec.parts.filter(q => q.parent === id).map(q => q.id);
+  info.innerHTML = `<b>${p.label}</b> <span style="color:var(--dim)">${p.id}</span><br>
+    Mass ${p.mass} kg · HP ${p.hp} · ${p.on_break === "detach" ? "breaks off" : "fails in place"}<br>
+    Parent: ${p.parent ?? "—"} · Moves: ${p.anim}<br>
+    ${p.shield.length ? "Shielded by: " + p.shield.join(", ") + "<br>" : ""}
+    ${kids.length ? "Carries: " + kids.join(", ") + "<br>" : ""}
+    <span style="color:var(--dim)">${p.effect}</span>`;
+}
+function descendants(id) { const out = [id]; for (const q of spec.parts) if (q.parent === id) out.push(...descendants(q.id)); return out; }
+function toggleBreak(id) {
+  const P = parts[id];
+  if (P.p.on_break !== "detach") { info.innerHTML += "<br><i>This part fails in place; it does not come off.</i>"; return; }
+  const ids = descendants(id);
+  const breaking = !P.broken;
+  for (const k of ids) {
+    const Q = parts[k]; Q.broken = breaking; rows[k].classList.toggle("off", breaking);
+    if (breaking) {
+      const d = P.dir.clone().normalize();
+      Q.vel = new THREE.Vector3(d.x * 2.5, 3.5, d.z * 2.5); Q.spin = new THREE.Vector3(Math.random() * 6 - 3, Math.random() * 6 - 3, Math.random() * 6 - 3);
+    } else { Q.vel = null; Q.holder.position.copy(Q.home); Q.holder.rotation.set(...Q.p.rest.map(d => d * Math.PI / 180), "ZYX"); }
+  }
+}
+document.getElementById("reset").onclick = () => { for (const k in parts) if (parts[k].broken) toggleBreak(k); for (const k in parts) if (parts[k].broken) toggleBreak(k); };
+
+// picking
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(root.children, true).filter(h => h.object.visible && (Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex].visible !== false : true));
+  return hits.length ? hits[0].object.userData.part : null;
+}
+let down = null;
+renderer.domElement.addEventListener("pointerdown", e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener("pointerup", e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 4) { const id = pick(e); if (id) select(id); } });
+renderer.domElement.addEventListener("dblclick", e => { const id = pick(e); if (id) toggleBreak(id); });
+
+// controls
+const ex = document.getElementById("explode");
+document.getElementById("damaged").onchange = e => { for (const k in parts) { const P = parts[k]; if (P.dmg) { P.dmg.visible = e.target.checked; P.intact.visible = !e.target.checked; } } };
+document.getElementById("xray").onchange = e => {
+  for (const k in parts) {
+    const P = parts[k], ghost = e.target.checked && ["body", "glass", "structure"].includes(P.p.group) && k !== "chassis";
+    P.holder.traverse(o => { if (o.isMesh) o.material = o.material.map(m => { if (!m.visible) return m;
+      if (ghost) { o.userData.orig ??= o.material; const g = m.clone(); g.transparent = true; g.opacity = 0.12; g.depthWrite = false; return g; }
+      return m; }); if (o.isMesh && !ghost && o.userData.orig) { o.material = o.userData.orig; delete o.userData.orig; } });
+  }
+};
+document.getElementById("paint").oninput = e => tints[0].set(e.target.value);
+document.getElementById("accent").oninput = e => tints[1].set(e.target.value);
+
+function resize() { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const e = +ex.value;
+  for (const k in parts) {
+    const P = parts[k];
+    if (P.broken) {
+      P.vel.y -= 9.8 * dt; P.holder.position.addScaledVector(P.vel, dt);
+      P.holder.rotation.x += P.spin.x * dt; P.holder.rotation.y += P.spin.y * dt; P.holder.rotation.z += P.spin.z * dt;
+      if (P.holder.position.y < 0.05) { P.holder.position.y = 0.05; P.vel.multiplyScalar(0.5); P.vel.y = Math.abs(P.vel.y) * 0.3; P.spin.multiplyScalar(0.6); }
+    } else P.holder.position.copy(P.home).addScaledVector(P.dir, e * 1.2);
+  }
+  if (selected) { selBox.box.setFromObject(parts[selected].holder); selBox.visible = true; }
+  controls.update(); renderer.render(scene, camera);
+});
+const VIEWS = { front:[1.2,1.4,7], side:[7.5,1.2,0.01], rear:[-1.6,2.2,-7], top:[0.01,9,0.3], under:[3,-4.5,3] };
+for (const b of document.querySelectorAll("[data-v]")) b.onclick = () => { camera.position.set(...VIEWS[b.dataset.v]); controls.target.set(0, 0.6, 0); };
+window.__viewer = { camera, controls, parts, select, toggleBreak };
+window.__ready = true;
+</script>
+</body>
+</html>

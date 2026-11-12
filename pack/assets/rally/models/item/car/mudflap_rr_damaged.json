@@ -1,0 +1,92 @@
+{
+ "textures": {
+  "mudflap": "rally:item/car/mudflap",
+  "particle": "rally:item/car/mudflap"
+ },
+ "elements": [
+  {
+   "from": [
+    7.068,
+    4.834,
+    7.8977
+   ],
+   "to": [
+    8.828,
+    8.034,
+    8.0577
+   ],
+   "rotation": {
+    "origin": [
+     7.948,
+     6.434,
+     7.9777
+    ],
+    "x": -2.902,
+    "y": -4.557,
+    "z": -1.553
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#mudflap",
+     "tintindex": 1
+    }
+   }
+  }
+ ]
+}
