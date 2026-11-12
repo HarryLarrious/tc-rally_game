@@ -4,15 +4,15 @@
   "model": "rally:item/car/cage",
   "transformation": {
    "translation": [
+    1.5,
     -0.5,
-    -0.5,
-    -0.5
+    1.5
    ],
    "left_rotation": [
     0,
+    1,
     0,
-    0,
-    1
+    0
    ],
    "scale": [
     2.0,

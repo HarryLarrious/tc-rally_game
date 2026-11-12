@@ -1,0 +1,19 @@
+// The resource pack: every player gets it on join, and @pack sends it again.
+
+/** The published pack (tools/build_pack.py --publish prints it). */
+function packUrl(): str {
+    return "https://raw.githubusercontent.com/HarryLarrious/tc-rally_game/pack-dist/rally-pack-034470a763b7.zip";
+}
+
+/** Sends the resource pack to the player. */
+function packSend {
+    default.sendResourcePack(packUrl());
+}
+
+playerevent resourcePackLoad {
+    default.sendMessage(s"<green>Pack loaded.</green> <gray>Type <yellow>@car</yellow> to spawn a car, <yellow>@clearcars</yellow> to remove them all.");
+}
+
+playerevent resourcePackDecline {
+    default.sendMessage(s"<red>Resource pack declined.</red> <gray>The cars are drawn by it. Allow server resource packs and type <yellow>@pack</yellow>.");
+}

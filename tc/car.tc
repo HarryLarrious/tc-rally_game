@@ -1,0 +1,115 @@
+// Cars: spawning and removing the part displays.
+//
+// A car is carPartCount() item displays, one per part, all standing on the
+// car origin (on the ground, between the axles). DiamondFire spawns item
+// displays without the location's yaw, so the heading is in the matrix:
+// each display's matrix is yawMatrix(heading) * the part's rest matrix from
+// car_data.tc.
+
+/** Part display UUIDs of every car; car c owns carEnt[carFirst[c]] onward,
+ * carPartCount() of them. */
+declare global carEnt: list[str];
+/** Index in carEnt of each car's first part. */
+declare global carFirst: list[num];
+/** Each car's origin (on the ground between the axles) and heading. */
+declare global carOrigin: list[loc];
+/** Number of cars. */
+declare global carCount: num;
+
+/** Body paint colors cycled through by new cars. */
+function carPaints(): list {
+    return [0xD8D8D8, 0xC81E1E, 0x1E5AA8, 0xF0B429, 0x2E8B3A, 0x202124];
+}
+
+/** Accent colors, paired with carPaints by index. */
+function carAccents(): list {
+    return [0x1E5AA8, 0xF0F0F0, 0xF0B429, 0x202124, 0xF0F0F0, 0xC81E1E];
+}
+
+/** Spawns a car with its origin at `at`, facing at's yaw, painted with the
+ * paint and accent colors. With `only` set to a part id, spawns just that
+ * part (for checking models). Returns the new car's number. */
+function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
+    line yaw: num = at.getCoordinate(coord="Yaw");
+    line x: num = at.getCoordinate(coord="X");
+    line y: num = at.getCoordinate(coord="Y");
+    line z: num = at.getCoordinate(coord="Z");
+    line origin = loc(line x, line y, line z, 0, 0);
+    // Turning the car frame by -yaw about +Y points its +Z where yaw faces.
+    line c = num.cos(0 - line yaw);
+    line s = num.sin(0 - line yaw);
+    global carCount += 1;
+    global carFirst.append(global carEnt.len() + 1);
+    global carOrigin.append(line origin);
+    for (line part of carPartData()) {
+        line p = line part as list;
+        if (only != "" && line p[1] as str != only) {
+            continue;
+        }
+        line look = item("stone").setModel(line p[2] as str).setModelDataNumbers(paint, accent, type="Colors");
+        game.spawnItemDisplay(line origin, line look);
+        lastEntity.setDisplayTransformationMatrix(turnMatrix(line p[3] as list, line c, line s));
+        global carEnt.append(lastEntity.uuid);
+    }
+    return global carCount;
+}
+
+/** Row-major matrix m turned about +Y: rows 1 and 3 mix by (cos c, sin s). */
+function turnMatrix(m: list, c: num, s: num): list {
+    line out = [];
+    repeat (line j to 4) {
+        line out.append(c * (m[line j] as num) + s * (m[8 + line j] as num));
+    }
+    repeat (line j to 4) {
+        line out.append(m[4 + line j] as num);
+    }
+    repeat (line j to 4) {
+        line out.append(c * (m[8 + line j] as num) - s * (m[line j] as num));
+    }
+    line out.append(0, 0, 0, 1);
+    return line out;
+}
+
+/** Messages the player which parts of car c have no display in the world. */
+function carCheck(c: num) {
+    line missing = 0;
+    line data = carPartData();
+    repeat (line i to carPartCount()) {
+        select entitiesByName(global carEnt[global carFirst[c] + line i - 1]);
+        if (!selectedEntity.exists()) {
+            line missing += 1;
+            line id = (line data[line i] as list)[1] as str;
+            default.sendMessage(s"<red>missing: %var(id)");
+        }
+        select reset;
+    }
+    default.sendMessage(s"<gray>Car %var(c): %var(missing) part(s) missing.");
+}
+
+/** Removes every car's displays and empties the car lists. */
+function clearCars {
+    for (line id of global carEnt) {
+        select entitiesByName(line id as str);
+        selectedEntity.remove();
+        select reset;
+    }
+    global carEnt = [];
+    global carFirst = [];
+    global carOrigin = [];
+    global carCount = 0;
+}
+
+/** Spawns a car 6 blocks in front of the player on their feet level, facing
+ * the way they look turned by `turn` degrees, with the next paint scheme.
+ * With `only` set to a part id, spawns just that part. */
+function spawnCarHere(turn: num = 0, only: str = "") {
+    line feet = default.location;
+    line yaw: num = line feet.getCoordinate(coord="Yaw");
+    line at = loc(line feet.getCoordinate(coord="X"), line feet.getCoordinate(coord="Y"), line feet.getCoordinate(coord="Z"), 0, line yaw);
+    line at = line at.shiftInDirection(6, direction="Forward");
+    line at = loc(line at.getCoordinate(coord="X"), line at.getCoordinate(coord="Y"), line at.getCoordinate(coord="Z"), 0, line yaw + turn);
+    line k = global carCount % carPaints().len() + 1;
+    line n = carPartCount();
+    line c = spawnCar(line at, carPaints()[line k] as num, carAccents()[line k] as num, only);
+    default.sendMessage(s"<gray>Car <yellow>%var(c)</yellow> spawned: %var(n) parts.");
+}

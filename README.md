@@ -11,6 +11,8 @@ separate parts, so they can be damaged and broken apart.
 | [car/](car/) | Car design: [README](car/README.md), [part list](car/PARTS.md), `parts.json` for the game code |
 | [pack/](pack/) | Resource pack (Minecraft 26.3, format 97.1), namespace `rally` |
 | [pack/src/car_parts.py](pack/src/car_parts.py) | Generates the car models, textures and part data |
+| [tc/](tc/) | Terracotta code for the plot (163352, Massive): pack, commands, car spawning; `car_data.tc` is generated |
+| [tools/build_pack.py](tools/build_pack.py) | Validates, zips and publishes the pack to the `pack-dist` branch |
 | [tools/viewer/](tools/viewer/) | 3D viewer for the car models |
 
 ## Build the car
@@ -22,6 +24,24 @@ python3 pack/src/car_parts.py
 Needs Python 3 with Pillow. It rewrites the files under
 `pack/assets/rally/`, `car/parts.json`, `car/PARTS.md` and
 `tools/viewer/car_data.js`.
+
+## Publish the pack
+
+```bash
+python3 tools/build_pack.py --publish --push
+```
+
+Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
+
+## In game
+
+| Command | Effect |
+| --- | --- |
+| `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
+| `@part <id> [turn]` | Spawn one part only, to check its model |
+| `@carcheck` | List the newest car's parts that have no display |
+| `@clearcars` | Remove every car |
+| `@pack` | Send the resource pack again |
 
 ## View the car
 

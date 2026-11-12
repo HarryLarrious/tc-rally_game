@@ -1,0 +1,40 @@
+// Chat commands and the join event. Add new commands here: a project has one
+// command event.
+
+playerevent join {
+    packSend();
+}
+
+playerevent command {
+    line words = event.command.split(" ");
+    line cmd = (line words[1] as str).replace("@", "");
+    if (line cmd == "car") {
+        // @car [turn degrees]: turn 90 shows the car's left side.
+        line turn = 0;
+        if (line words.len() >= 2) {
+            line turn = num.parse(line words[2] as str);
+        }
+        spawnCarHere(line turn);
+    } else if (line cmd == "part") {
+        // @part ID [turn]: spawns one part, for checking its model.
+        if (line words.len() < 2) {
+            default.sendMessage(s"<gray>Usage: <yellow>@part ID [turn]</yellow>");
+            return;
+        }
+        line turn = 0;
+        if (line words.len() >= 3) {
+            line turn = num.parse(line words[3] as str);
+        }
+        spawnCarHere(line turn, line words[2] as str);
+    } else if (line cmd == "carcheck") {
+        carCheck(global carCount);
+    } else if (line cmd == "clearcars") {
+        line n = global carCount;
+        clearCars();
+        default.sendMessage(s"<gray>Removed <yellow>%var(n)</yellow> car(s).");
+    } else if (line cmd == "pack") {
+        packSend();
+    } else {
+        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
+    }
+}

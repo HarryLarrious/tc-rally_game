@@ -1,7 +1,7 @@
 {
  "textures": {
   "accent": "rally:item/car/accent",
-  "fogLight": "rally:item/car/fogLight",
+  "foglight": "rally:item/car/foglight",
   "grille": "rally:item/car/grille",
   "paint": "rally:item/car/paint",
   "plastic": "rally:item/car/plastic",
@@ -260,7 +260,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "east": {
      "uv": [
@@ -269,7 +269,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "west": {
      "uv": [
@@ -278,7 +278,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "up": {
      "uv": [
@@ -287,7 +287,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "down": {
      "uv": [
@@ -296,7 +296,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15
@@ -320,7 +320,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "east": {
      "uv": [
@@ -329,7 +329,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "west": {
      "uv": [
@@ -338,7 +338,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "up": {
      "uv": [
@@ -347,7 +347,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     },
     "down": {
      "uv": [
@@ -356,7 +356,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15

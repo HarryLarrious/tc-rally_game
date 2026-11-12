@@ -40,7 +40,12 @@ car rotation * translate(pivot) * rotate(rest) * animation
 The models are authored at half size, so that a part can reach 3 m from its
 pivot inside Minecraft's -16..32 element limit. Each item definition scales
 the model back up with a `transformation`, so the game code uses 1:1 meters
-and no extra scale.
+and no extra scale. The same `transformation` also undoes the 180° Y turn
+that Minecraft applies to every item display, so the matrix above is all the
+game needs.
+
+DiamondFire spawns item displays without the yaw of the spawn location, so a
+car's heading goes into the matrix too (`turnMatrix` in `tc/car.tc`).
 
 Parts that move use one of these animations (the `anim` field):
 
@@ -137,9 +142,9 @@ this costs too much:
   stay unspawned until the body around them is gone.
 - Parts that never come off (chassis, shell, cage) could merge into one model.
 
-## Not tested yet
+## Tested in game
 
-- The models have not been loaded in Minecraft. The viewer draws the same
-  JSON with the same rotation rules, but a check on the client is still
-  needed: translucent glass, emissive lamps, the item `transformation`, and the
-  look of 16-pixel textures stretched over large panels.
+Spawned on plot 163352 (Minecraft 26.3, 2026-11-12): all 52 parts load and
+sit where the viewer shows them; glass is translucent, the lamps glow, and
+the paint and accent tints work. The damaged models have not been shown in
+game yet.

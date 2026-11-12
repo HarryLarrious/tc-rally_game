@@ -1,8 +1,8 @@
 {
  "textures": {
-  "fogLight": "rally:item/car/fogLight",
+  "foglight": "rally:item/car/foglight",
   "plastic": "rally:item/car/plastic",
-  "particle": "rally:item/car/fogLight"
+  "particle": "rally:item/car/foglight"
  },
  "elements": [
   {
@@ -442,7 +442,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15
@@ -816,7 +816,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15
@@ -1190,7 +1190,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15
@@ -1564,7 +1564,7 @@
       16,
       16
      ],
-     "texture": "#fogLight"
+     "texture": "#foglight"
     }
    },
    "light_emission": 15
