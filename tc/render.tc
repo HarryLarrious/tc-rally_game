@@ -1,0 +1,114 @@
+// Drawing a car: every display is teleported to the car origin, the rigid
+// parts get the car's rotation matrix in one action, and each mover gets its
+// own matrix in the car frame times the car's rotation.
+
+/** How often (ticks) the arms, springs and half shafts are redrawn; they
+ * sit under the car, so they can update less often than the wheels. */
+declare global linkEvery: num;
+
+/** Sets display `id`'s matrix to the car rotation (L, U, F) times the
+ * car-frame matrix with columns cx, cy, cz and translation t, interpolated
+ * over `dur` ticks. */
+function setMover(id: str, cx: vec, cy: vec, cz: vec, t: vec, L: vec, U: vec, F: vec, dur: num) {
+    line wx = L * cx.x + U * cx.y + F * cx.z;
+    line wy = L * cy.x + U * cy.y + F * cy.z;
+    line wz = L * cz.x + U * cz.y + F * cz.z;
+    line wt = L * t.x + U * t.y + F * t.z;
+    select entitiesByName(id);
+    selectedEntity.setDisplayTransformationMatrix([line wx.x, line wy.x, line wz.x, line wt.x, line wx.y, line wy.y, line wz.y, line wt.y, line wx.z, line wy.z, line wz.z, line wt.z, 0, 0, 0, 1]);
+    selectedEntity.setDisplayInterpolation(dur, 0);
+    select reset;
+}
+
+/** Draws car c for this tick. */
+function carRender(c: num) {
+    line L = global cL[c];
+    line U = global cU[c];
+    line F = global cF[c];
+    line com = carCom();
+    line o = global cPos[c] - (L * line com.x + U * line com.y + F * line com.z);
+    line at = loc(line o.x, line o.y, line o.z);
+
+    select entitiesByName(global cAll[c] as list[str]);
+    selectedEntity.teleport(line at);
+    select reset;
+    select entitiesByName(global cRigid[c] as list[str]);
+    selectedEntity.setDisplayTransformationMatrix([L.x, U.x, F.x, 0, L.y, U.y, F.y, 0, L.z, U.z, F.z, 0, 0, 0, 0, 1]);
+    selectedEntity.setDisplayInterpolation(1, 0);
+    select reset;
+
+    // The driver's seat, on the left seat cushion.
+    line seat = line o + L * 0.33 + U * 0.1 - F * 0.05;
+    select entitiesByName(global cSeat[c]);
+    selectedEntity.teleport(loc(line seat.x, line seat.y, line seat.z));
+    select reset;
+
+    line move = global cMove[c] as list;
+    line links = global rTick % global linkEvery == 0;
+    line steer = global cSteer[c];
+    repeat (line i to 4) {
+        renderCorner(c, line i, line move, line links, line steer, L, U, F);
+    }
+    // Steering wheel: the column tilt, then the wheel turned 9x the road wheels.
+    line tilt = global gSteerTilt;
+    line ct = num.cos(line tilt);
+    line st = num.sin(line tilt);
+    line a = line steer * 9;
+    line ca = num.cos(line a);
+    line sa = num.sin(line a);
+    setMover(line move[21] as str, vec(line ca, line sa * line ct, line sa * line st), vec(0 - line sa, line ca * line ct, line ca * line st), vec(0, 0 - line st, line ct), vec(global gSteerX, global gSteerY, global gSteerZ), L, U, F, 1);
+}
+
+/** Draws corner i of car c: wheel and upright every tick; arm, spring and
+ * half shaft when `links` is set. */
+function renderCorner(c: num, i: num, move: list, links: num, steer: num, L: vec, U: vec, F: vec) {
+    line k = (c - 1) * 4 + i;
+    line side = 1;
+    if (i % 2 == 0) {
+        line side = -1;
+    }
+    line z = global gAxleR;
+    line psi = 0;
+    if (i <= 2) {
+        line z = global gAxleF;
+        line psi = steer;
+    }
+    if (line side < 0) {
+        line psi += 180;
+    }
+    line hubY = 0.2 + global wComp[line k];
+    if (global wComp[line k] == 0) {
+        line hubY = 0.2;
+    }
+    line hub = vec(line side * global gTrackX, line hubY, line z);
+    line cp = num.cos(line psi);
+    line sp = num.sin(line psi);
+    line a = global wSpin[line k] * line side;
+    line ca = num.cos(line a);
+    line sa = num.sin(line a);
+    // Wheel: turn psi about Y after rolling a about X.
+    setMover(move[(i - 1) * 5 + 1] as str, vec(line cp, 0, 0 - line sp), vec(line sp * line sa, line ca, line cp * line sa), vec(line sp * line ca, 0 - line sa, line cp * line ca), line hub, L, U, F, 1);
+    // Upright: turn only.
+    setMover(move[(i - 1) * 5 + 2] as str, vec(line cp, 0, 0 - line sp), vec(0, 1, 0), vec(line sp, 0, line cp), line hub, L, U, F, 1);
+    if (links) {
+        // Arm: swings about its inboard pivot so its ball joint follows the hub.
+        line th = num.asin(num.clamp((line hubY - global gHubRestY) / global gArmLen, -0.9, 0.9));
+        line ct = num.cos(line th);
+        line st = num.sin(line th);
+        line piv = vec(line side * global gArmX, global gArmY, line z);
+        setMover(move[(i - 1) * 5 + 3] as str, vec(line side * line ct, line st, 0), vec(0 - line side * line st, line ct, 0), vec(0, 0, line side), line piv, L, U, F, global linkEvery);
+        // Spring: from its seat on the arm to the strut top, stretched.
+        line bot = vec(line side * (global gArmX + global gSpringMountX * line ct - global gSpringMountY * line st), global gArmY + global gSpringMountX * line st + global gSpringMountY * line ct, line z);
+        line top = vec(line side * global gStrutX, global gStrutY, line z);
+        line dir = line top - line bot;
+        line dn = line dir.setLength(1);
+        setMover(move[(i - 1) * 5 + 4] as str, line dn.cross(vec(0, 0, 1)), line dir * (1 / global gSpringRest), vec(0, 0, 1), line bot, L, U, F, global linkEvery);
+        // Half shaft: from the diff to the hub, stretched.
+        line inner = vec(line side * global gShaftInX, global gShaftInY, line z);
+        line outer = vec(line side * (global gTrackX - global gHubInset), line hubY, line z);
+        line sx = line outer - line inner;
+        line sxn = line sx.setLength(1);
+        line sy = (vec(0, 1, 0) - line sxn * line sxn.y).setLength(1);
+        setMover(move[(i - 1) * 5 + 5] as str, line sx * (1 / global gShaftRest), line sy, line sxn.cross(line sy), line inner, L, U, F, global linkEvery);
+    }
+}

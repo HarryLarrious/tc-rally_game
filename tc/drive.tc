@@ -1,0 +1,200 @@
+// Driving: getting in and out, reading the driver's keys, the main loop.
+//
+// Controls: W throttle, S brake (reverse once stopped), A/D steer, hold
+// Shift for the handbrake (it would dismount; the dismount is cancelled
+// every tick it is held), F to get out, Q to put the car back on its wheels.
+
+/** Loop bookkeeping: id of the running loop and its last heartbeat tick. */
+declare global loopId: num;
+declare global lastBeat: num;
+/** CPU usage, smoothed. */
+declare global cpuAvg: num;
+/** 1: the driver HUD shows physics debug values (@dbg). */
+declare global dbg: num;
+
+/** The car player `uuid` drives, or 0. */
+function carOf(uuid: str): num {
+    return global cDriver.find(uuid);
+}
+
+/** Seats the player in the nearest free car within 8 blocks. */
+function enterNearestCar {
+    if (carOf(default.uuid) != 0) {
+        default.sendMessage(s"<gray>You are already driving.");
+        return;
+    }
+    line me = default.location;
+    line best = 0;
+    line bestD = 8;
+    repeat (line c to global carCount) {
+        if (global cStatic[line c] == 0 && global cDriver[line c] == "") {
+            line p = global cPos[line c];
+            line d = (vec(me.x, me.y, me.z) - line p).len();
+            if (line d < line bestD) {
+                line best = line c;
+                line bestD = line d;
+            }
+        }
+    }
+    if (line best == 0) {
+        default.sendMessage(s"<gray>No free car within 8 blocks. <yellow>@car</yellow> spawns one.");
+        return;
+    }
+    ensureLoop();
+    global cDriver[line best] = default.uuid;
+    global cAwake[line best] = 60;
+    carRender(line best);
+    default.rideEntity(global cSeat[line best]);
+    default.sendMessage(s"<gray><yellow>W/S</yellow> throttle/brake, <yellow>A/D</yellow> steer, hold <yellow>Shift</yellow> handbrake, <yellow>F</yellow> get out, <yellow>Q</yellow> back on wheels.");
+}
+
+/** Takes the player out of their car and puts them beside it. */
+function exitCar {
+    line c = carOf(default.uuid);
+    if (line c == 0) {
+        return;
+    }
+    global cDriver[line c] = "";
+    global cAwake[line c] = 60;
+    default.rideEntity();
+    line p = global cPos[line c] + global cL[line c] * 1.6 + vec(0, 0.6, 0);
+    default.teleport(loc(p.x, p.y, p.z), keepRot="True");
+}
+
+playerevent dismount {
+    line c = carOf(default.uuid);
+    if (line c != 0) {
+        // Shift held: handbrake. Getting out is F.
+        event.cancel();
+        global cHand[line c] = global rTick;
+    }
+}
+
+playerevent swapHands {
+    if (carOf(default.uuid) != 0) {
+        event.cancel();
+        exitCar();
+    }
+}
+
+playerevent dropItem {
+    line c = carOf(default.uuid);
+    if (line c != 0) {
+        event.cancel();
+        carUpright(line c);
+    }
+}
+
+playerevent leave {
+    line c = carOf(default.uuid);
+    if (line c != 0) {
+        global cDriver[line c] = "";
+        global cAwake[line c] = 60;
+    }
+}
+
+/** Advances every car one tick: input, physics, drawing, the driver HUD. */
+function carsTick {
+    global rTick += 1;
+    global cpuAvg = global cpuAvg * 0.9 + game.cpuUsage * 0.1;
+    repeat (line c to global carCount) {
+        if (global cStatic[line c] == 1) {
+            continue;
+        }
+        line driver = global cDriver[line c];
+        if (line driver == "") {
+            if (global cAwake[line c] <= 0) {
+                continue;
+            }
+            global cAwake[line c] -= 1;
+            carStep(line c, 0, 0, 0);
+            // Keep simulating while it still moves.
+            if ((global cVel[line c] as vec).len() > 0.15 || (global cW[line c] as vec).len() > 0.1) {
+                global cAwake[line c] = num.max(global cAwake[line c], 20);
+            }
+        } else {
+            select playersByName(line driver);
+            line fwd = selected.steerForwardMovement;
+            line side = selected.steerSidewaysMovement;
+            select reset;
+            line hand = 0;
+            if (global rTick - global cHand[line c] <= 1) {
+                line hand = 1;
+            }
+            carStep(line c, line fwd, line side, line hand);
+            carHud(line c);
+        }
+        carRender(line c);
+    }
+}
+
+/** The driver's action bar: speed, gear, rpm and plot CPU. */
+function carHud(c: num) {
+    line kmh = num.floor(num.abs((global cVel[c] as vec).dot(global cF[c])) * 3.6);
+    line gear = global cGear[c];
+    line g = "%var(gear)";
+    if (line gear == -1) {
+        line g = "R";
+    }
+    line rpm = num.floor(global cRpm[c] / 100) * 100;
+    line cpu = num.floor(global cpuAvg * 10) / 10;
+    if (global dbg == 1) {
+        line k = (c - 1) * 4;
+        line c1 = global wComp[line k + 1];
+        line c2 = global wComp[line k + 2];
+        line c3 = global wComp[line k + 3];
+        line c4 = global wComp[line k + 4];
+        line s1 = global wSlide[line k + 1] + global wSlide[line k + 2] + global wSlide[line k + 3] + global wSlide[line k + 4];
+        line v = global cVel[c];
+        line p = global cPos[c];
+        line imp = global cImpact[c];
+        line mu = global wMu[line k + 3];
+        line fo = global dbgForce;
+        line gm = global gMass;
+        line t = global rTick;
+        select playersByName(global cDriver[c]);
+        selected.sendActionBar(s"<gray>comp %var(c1) %var(c2) %var(c3) %var(c4) slide %var(s1) mu %var(mu) v %var(v) y %var(p) imp %var(imp) F %var(fo) m %var(gm) t %var(t)");
+        select reset;
+        return;
+    }
+    select playersByName(global cDriver[c]);
+    if (global rTick - global cHand[c] <= 1) {
+        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray>   <red><b>HANDBRAKE</b></red>");
+    } else {
+        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%");
+    }
+    select reset;
+}
+
+/** Starts the car loop unless one beat within the last few ticks. */
+function ensureLoop {
+    if (game.ticksSinceStartup - global lastBeat > 5) {
+        start carLoop;
+    }
+}
+
+process carLoop {
+    loadCarGeom();
+    loadProbes();
+    loadSurfaces();
+    if (global tSpring == 0) {
+        resetTuning();
+    }
+    dropStaleCars();
+    if (global linkEvery == 0) {
+        global linkEvery = 2;
+    }
+    global loopId += 1;
+    line myId = global loopId;
+    repeat {
+        // A newer loop was started: let this one end.
+        if (global loopId != line myId) {
+            break;
+        }
+        global lastBeat = game.ticksSinceStartup;
+        if (global carCount > 0) {
+            carsTick();
+        }
+        wait;
+    }
+}

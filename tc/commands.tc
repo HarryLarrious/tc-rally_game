@@ -3,6 +3,7 @@
 
 playerevent join {
     packSend();
+    ensureLoop();
 }
 
 playerevent command {
@@ -26,6 +27,14 @@ playerevent command {
             line turn = num.parse(line words[3] as str);
         }
         spawnCarHere(line turn, line words[2] as str);
+    } else if (line cmd == "drive") {
+        enterNearestCar();
+    } else if (line cmd == "exit") {
+        exitCar();
+    } else if (line cmd == "dbg") {
+        global dbg = 1 - global dbg;
+    } else if (line cmd == "tune") {
+        tuneCommand(line words);
     } else if (line cmd == "carcheck") {
         carCheck(global carCount);
     } else if (line cmd == "clearcars") {
@@ -35,6 +44,38 @@ playerevent command {
     } else if (line cmd == "pack") {
         packSend();
     } else {
-        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
+        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
     }
+}
+
+/** @tune: lists the tunables; @tune NAME VALUE sets one; @tune reset. */
+function tuneCommand(words: list) {
+    if (words.len() >= 2 && words[2] as str == "reset") {
+        resetTuning();
+        global linkEvery = 2;
+    } else if (words.len() >= 3) {
+        line name = words[2] as str;
+        line v = num.parse(words[3] as str);
+        if (line name == "spring") {
+            global tSpring = line v;
+        } else if (line name == "damper") {
+            global tDamper = line v;
+        } else if (line name == "grip") {
+            global tGrip = line v;
+        } else if (line name == "power") {
+            global tPower = line v;
+        } else if (line name == "brake") {
+            global tBrake = line v;
+        } else if (line name == "steer") {
+            global tSteer = line v;
+        } else if (line name == "lat") {
+            global tLatGain = line v;
+        } else if (line name == "links") {
+            global linkEvery = num.max(1, num.floor(line v));
+        } else {
+            default.sendMessage(s"<red>Unknown tunable.");
+            return;
+        }
+    }
+    default.sendMessage(s"<gray>spring <white>%var(tSpring)</white> damper <white>%var(tDamper)</white> grip <white>%var(tGrip)</white> power <white>%var(tPower)</white> brake <white>%var(tBrake)</white> steer <white>%var(tSteer)</white> lat <white>%var(tLatGain)</white> links <white>%var(linkEvery)</white>");
 }

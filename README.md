@@ -38,10 +38,30 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | Command | Effect |
 | --- | --- |
 | `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
+| `@drive` | Get in the nearest free car within 8 blocks |
+| `@exit` | Get out (same as F) |
+| `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, links |
+| `@dbg` | Toggle the physics debug readout in the action bar |
 | `@part <id> [turn]` | Spawn one part only, to check its model |
 | `@carcheck` | List the newest car's parts that have no display |
 | `@clearcars` | Remove every car |
 | `@pack` | Send the resource pack again |
+
+## Driving
+
+W throttle, S brake (reverse once stopped), A/D steer, hold Shift for the
+handbrake, F to get out, Q to put the car back on its wheels. The action bar
+shows speed, gear, rpm and plot CPU.
+
+The physics (`tc/physics.tc`) is one rigid body per car, stepped once per
+tick: ray-cast spring-damper suspension per wheel, tires capped by a friction
+circle that depends on the surface block, a torque curve with a six-speed
+automatic and 40/60 four-wheel drive, and probe points that push the body out
+of blocks. All rigid parts share one display matrix (`tc/render.tc`), so a
+driven car costs about 5% plot CPU.
+
+DiamondFire numbers keep 3 decimals, so the physics works per unit mass
+(accelerations) and never multiplies by 1 / mass.
 
 ## View the car
 

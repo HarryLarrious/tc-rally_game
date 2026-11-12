@@ -1,18 +1,54 @@
-// Cars: spawning and removing the part displays.
+// Cars: state, spawning and removing.
 //
-// A car is carPartCount() item displays, one per part, all standing on the
-// car origin (on the ground, between the axles). DiamondFire spawns item
-// displays without the location's yaw, so the heading is in the matrix:
-// each display's matrix is yawMatrix(heading) * the part's rest matrix from
-// car_data.tc.
+// A car is one rigid body (physics.tc) drawn by carPartCount() item displays
+// (render.tc). All displays stand on the car origin (on the ground between
+// the axles, in the car frame) and are teleported there every tick. "Rigid"
+// parts are modeled around that origin and all share the car's rotation
+// matrix; wheels, uprights, arms, springs, half shafts and the steering wheel
+// get their own matrix. The driver rides an interaction-entity seat
+// (drive.tc).
+//
+// Car frame: +X left, +Y up, +Z forward, meters. A car's orientation is its
+// left (cL), up (cU) and forward (cF) unit vectors in world space.
 
-/** Part display UUIDs of every car; car c owns carEnt[carFirst[c]] onward,
- * carPartCount() of them. */
-declare global carEnt: list[str];
-/** Index in carEnt of each car's first part. */
-declare global carFirst: list[num];
-/** Each car's origin (on the ground between the axles) and heading. */
-declare global carOrigin: list[loc];
+/** Display UUIDs of each car: every part, the rigid ones, and the movers in
+ * mover order (per corner 1..4: wheel, upright, arm, spring, half shaft;
+ * then the steering wheel). */
+declare global cAll: list;
+declare global cRigid: list;
+declare global cMove: list;
+/** Seat entity UUID and driver UUID ("" when empty). */
+declare global cSeat: list[str];
+declare global cDriver: list[str];
+/** Body state: center of mass position and velocity, angular velocity
+ * (world, rad/s), and the frame vectors. */
+declare global cPos: list[vec];
+declare global cVel: list[vec];
+declare global cW: list[vec];
+declare global cL: list[vec];
+declare global cU: list[vec];
+declare global cF: list[vec];
+/** Front wheel angle (degrees, + = left), gear (-1 reverse, 1..6), engine
+ * rpm, ticks until a gear change finishes, and the last tick the handbrake
+ * was held. */
+declare global cSteer: list[num];
+declare global cGear: list[num];
+declare global cRpm: list[num];
+declare global cShift: list[num];
+declare global cHand: list[num];
+/** Ticks the car keeps simulating without a driver; 1 = a debug part spawn
+ * that never simulates. */
+declare global cAwake: list[num];
+declare global cStatic: list[num];
+/** Strongest impact speed (m/s) this tick, for sound and later damage. */
+declare global cImpact: list[num];
+/** Per wheel, 4 per car (car c, corner i at (c - 1) * 4 + i): suspension
+ * compression (m), roll angle (degrees), surface grip, and 1 when the tire
+ * is sliding. */
+declare global wComp: list[num];
+declare global wSpin: list[num];
+declare global wMu: list[num];
+declare global wSlide: list[num];
 /** Number of cars. */
 declare global carCount: num;
 
@@ -26,76 +62,162 @@ function carAccents(): list {
     return [0x1E5AA8, 0xF0F0F0, 0xF0B429, 0x202124, 0xF0F0F0, 0xC81E1E];
 }
 
+/** Center of mass in the car frame. */
+function carCom(): vec {
+    return vec(0, 0.5, 0.05);
+}
+
+/** Index of a mover in cMove: corner 1..4 and kind, or 21 for the steering
+ * wheel. */
+function moverIndex(kind: str, corner: num): num {
+    if (kind == "steer") {
+        return 21;
+    }
+    line k = ["wheel", "upright", "arm", "spring", "halfshaft"].find(kind);
+    return (corner - 1) * 5 + line k;
+}
+
 /** Spawns a car with its origin at `at`, facing at's yaw, painted with the
  * paint and accent colors. With `only` set to a part id, spawns just that
- * part (for checking models). Returns the new car's number. */
+ * part and never simulates it (for checking models). Returns the car's
+ * number. */
 function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     line yaw: num = at.getCoordinate(coord="Yaw");
-    line x: num = at.getCoordinate(coord="X");
-    line y: num = at.getCoordinate(coord="Y");
-    line z: num = at.getCoordinate(coord="Z");
-    line origin = loc(line x, line y, line z, 0, 0);
-    // Turning the car frame by -yaw about +Y points its +Z where yaw faces.
-    line c = num.cos(0 - line yaw);
-    line s = num.sin(0 - line yaw);
+    line origin = loc(at.x, at.y, at.z, 0, 0);
+    line fwd = vec(0 - num.sin(line yaw), 0, num.cos(line yaw));
+    line up = vec(0, 1, 0);
+    line left = line up.cross(line fwd);
+
     global carCount += 1;
-    global carFirst.append(global carEnt.len() + 1);
-    global carOrigin.append(line origin);
-    for (line part of carPartData()) {
-        line p = line part as list;
+    line all = [];
+    line rigid = [];
+    line move = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+    for (line row of carPartData()) {
+        line p = (line row as str).split(" ");
         if (only != "" && line p[1] as str != only) {
             continue;
         }
         line look = item("stone").setModel(line p[2] as str).setModelDataNumbers(paint, accent, type="Colors");
         game.spawnItemDisplay(line origin, line look);
-        lastEntity.setDisplayTransformationMatrix(turnMatrix(line p[3] as list, line c, line s));
-        global carEnt.append(lastEntity.uuid);
+        lastEntity.setDisplayTeleportDuration(1);
+        // Full brightness: the displays stand on the car origin at ground
+        // level, where the light DF samples would be 0.
+        lastEntity.setDisplayBrightness(15, 15);
+        line id = lastEntity.uuid;
+        line all.append(line id);
+        if (line p[3] as str == "rigid") {
+            line rigid.append(line id);
+        } else {
+            line move[moverIndex(line p[3] as str, num.parse(line p[4] as str))] = line id;
+        }
+    }
+    global cAll.append(line all);
+    global cRigid.append(line rigid);
+    global cMove.append(line move);
+
+    // The seat: an interaction entity the driver rides (drive.tc moves it).
+    game.spawnInteractionEntity(line origin, 0.01, 0.01);
+    global cSeat.append(lastEntity.uuid);
+    global cDriver.append("");
+
+    line com = carCom();
+    global cPos.append(vec(at.x, at.y + 0.1, at.z) + line left * line com.x + line up * line com.y + line fwd * line com.z);
+    global cVel.append(vec(0, 0, 0));
+    global cW.append(vec(0, 0, 0));
+    global cL.append(line left);
+    global cU.append(line up);
+    global cF.append(line fwd);
+    global cSteer.append(0);
+    global cGear.append(1);
+    global cRpm.append(900);
+    global cShift.append(0);
+    global cHand.append(-10);
+    global cAwake.append(60);
+    global cImpact.append(0);
+    if (only != "") {
+        global cStatic.append(1);
+    } else {
+        global cStatic.append(0);
+    }
+    repeat (line i to 4) {
+        global wComp.append(0);
+        global wSpin.append(0);
+        global wMu.append(0.9);
+        global wSlide.append(0);
+    }
+    if (only == "") {
+        carRender(global carCount);
     }
     return global carCount;
-}
-
-/** Row-major matrix m turned about +Y: rows 1 and 3 mix by (cos c, sin s). */
-function turnMatrix(m: list, c: num, s: num): list {
-    line out = [];
-    repeat (line j to 4) {
-        line out.append(c * (m[line j] as num) + s * (m[8 + line j] as num));
-    }
-    repeat (line j to 4) {
-        line out.append(m[4 + line j] as num);
-    }
-    repeat (line j to 4) {
-        line out.append(c * (m[8 + line j] as num) - s * (m[line j] as num));
-    }
-    line out.append(0, 0, 0, 1);
-    return line out;
 }
 
 /** Messages the player which parts of car c have no display in the world. */
 function carCheck(c: num) {
     line missing = 0;
-    line data = carPartData();
-    repeat (line i to carPartCount()) {
-        select entitiesByName(global carEnt[global carFirst[c] + line i - 1]);
+    for (line id of global cAll[c] as list) {
+        select entitiesByName(line id as str);
         if (!selectedEntity.exists()) {
             line missing += 1;
-            line id = (line data[line i] as list)[1] as str;
-            default.sendMessage(s"<red>missing: %var(id)");
         }
         select reset;
     }
-    default.sendMessage(s"<gray>Car %var(c): %var(missing) part(s) missing.");
+    line n = (global cAll[c] as list).len();
+    default.sendMessage(s"<gray>Car %var(c): %var(missing) of %var(n) displays missing.");
 }
 
-/** Removes every car's displays and empties the car lists. */
+/** Forgets cars whose displays are gone (a mode switch removes plot
+ * entities but keeps the globals). */
+function dropStaleCars {
+    if (global carCount == 0) {
+        return;
+    }
+    select entitiesByName(global cSeat[1]);
+    if (!selectedEntity.exists()) {
+        select reset;
+        clearCars();
+        return;
+    }
+    select reset;
+}
+
+/** Removes every car (drivers get out first) and empties the car lists. */
 function clearCars {
-    for (line id of global carEnt) {
-        select entitiesByName(line id as str);
+    repeat (line c to global carCount) {
+        if (global cDriver[line c] != "") {
+            select playersByName(global cDriver[line c]);
+            selected.rideEntity();
+            select reset;
+        }
+        select entitiesByName(global cAll[line c] as list[str]);
+        selectedEntity.remove();
+        select reset;
+        select entitiesByName(global cSeat[line c]);
         selectedEntity.remove();
         select reset;
     }
-    global carEnt = [];
-    global carFirst = [];
-    global carOrigin = [];
+    global cAll = [];
+    global cRigid = [];
+    global cMove = [];
+    global cSeat = [];
+    global cDriver = [];
+    global cPos = [];
+    global cVel = [];
+    global cW = [];
+    global cL = [];
+    global cU = [];
+    global cF = [];
+    global cSteer = [];
+    global cGear = [];
+    global cRpm = [];
+    global cShift = [];
+    global cHand = [];
+    global cAwake = [];
+    global cStatic = [];
+    global cImpact = [];
+    global wComp = [];
+    global wSpin = [];
+    global wMu = [];
+    global wSlide = [];
     global carCount = 0;
 }
 
@@ -103,13 +225,13 @@ function clearCars {
  * the way they look turned by `turn` degrees, with the next paint scheme.
  * With `only` set to a part id, spawns just that part. */
 function spawnCarHere(turn: num = 0, only: str = "") {
+    ensureLoop();
     line feet = default.location;
     line yaw: num = line feet.getCoordinate(coord="Yaw");
-    line at = loc(line feet.getCoordinate(coord="X"), line feet.getCoordinate(coord="Y"), line feet.getCoordinate(coord="Z"), 0, line yaw);
+    line at = loc(line feet.x, line feet.y, line feet.z, 0, line yaw);
     line at = line at.shiftInDirection(6, direction="Forward");
-    line at = loc(line at.getCoordinate(coord="X"), line at.getCoordinate(coord="Y"), line at.getCoordinate(coord="Z"), 0, line yaw + turn);
+    line at = loc(line at.x, line at.y, line at.z, 0, line yaw + turn);
     line k = global carCount % carPaints().len() + 1;
-    line n = carPartCount();
     line c = spawnCar(line at, carPaints()[line k] as num, carAccents()[line k] as num, only);
-    default.sendMessage(s"<gray>Car <yellow>%var(c)</yellow> spawned: %var(n) parts.");
+    default.sendMessage(s"<gray>Car <yellow>%var(c)</yellow> spawned. <yellow>@drive</yellow> to get in.");
 }
