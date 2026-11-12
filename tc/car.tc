@@ -47,6 +47,8 @@ declare global cImpact: list[num];
 /** Ticks left in which hits and bottoming out do no damage (after spawning,
  * repairing or putting the car back on its wheels). */
 declare global cGrace: list[num];
+/** 1 while the engine is under throttle this tick (engine sound). */
+declare global cThr: list[num];
 /** Per wheel, 4 per car (car c, corner i at (c - 1) * 4 + i): suspension
  * compression (m), roll angle (degrees), surface grip, and 1 when the tire
  * is sliding. */
@@ -120,6 +122,7 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     global cAwake.append(60);
     global cImpact.append(0);
     global cGrace.append(40);
+    global cThr.append(0);
     if (only != "") {
         global cStatic.append(1);
     } else {
@@ -270,6 +273,7 @@ function clearCars {
     global cStatic = [];
     global cImpact = [];
     global cGrace = [];
+    global cThr = [];
     global wComp = [];
     global wSpin = [];
     global wMu = [];

@@ -123,6 +123,7 @@ function carsTick {
             }
             carStep(line c, line fwd, line side, line hand);
             carHud(line c);
+            engineSound(line c);
         }
         carRender(line c);
     }
@@ -139,7 +140,7 @@ function carHud(c: num) {
     if (line gear == -1) {
         line g = "R";
     }
-    line rpm = num.floor(global cRpm[c] / 100) * 100;
+    line rpm = num.round(global cRpm[c]);
     line cpu = num.floor(global cpuAvg * 10) / 10;
     if (global dbg == 1) {
         line k = (c - 1) * 4;

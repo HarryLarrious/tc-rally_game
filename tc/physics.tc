@@ -148,30 +148,36 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     line steer = global cSteer[c];
     line steer = line steer + num.clamp(line want - line steer, -5, 5);
 
-    // Engine: rpm from road speed, slip and launch; automatic gearbox.
+    // Engine: rpm from road speed, plus wheelspin and launch slip.
+    // Redline 7500, limiter 7800.
     line ratio = gearRatio(line gear);
-    line rpm = line speed / global gWheelR * 9.549 * line ratio * 4.1;
+    line road = line speed / global gWheelR * 9.549 * line ratio * 4.1;
     line spinning = 0;
     repeat (line i to 4) {
         if (global wSlide[(c - 1) * 4 + line i] == 1) {
             line spinning += 1;
         }
     }
+    line rpm = line road;
     if (line throttle > 0 && line spinning >= 2) {
-        line rpm = num.max(line rpm, global cRpm[c] + (7400 - global cRpm[c]) * 0.3);
+        // Spinning tires let the engine run up to 2500 over road speed.
+        line spinTo = num.min(line road + 2500, 7600);
+        line rpm = num.max(line rpm, global cRpm[c] + (line spinTo - global cRpm[c]) * 0.3);
     }
     if (line throttle > 0) {
         line rpm = num.max(line rpm, 2600);
     }
     line rpm = num.max(900, global cRpm[c] * 0.4 + line rpm * 0.6);
+    // Automatic gearbox: shifts on road speed (not wheelspin), up a little
+    // before the redline, down when it would bog.
     line shift = global cShift[c];
     if (line shift > 0) {
         line shift -= 1;
     } else if (line gear >= 1) {
-        if (line rpm > 7300 && line gear < 6 && line spinning < 2) {
+        if (line road > 6900 && line gear < 6) {
             line gear += 1;
             line shift = 4;
-        } else if (line rpm < 3200 && line gear > 1) {
+        } else if (line road < 3000 && line gear > 1) {
             line gear -= 1;
             line shift = 3;
         }
@@ -241,6 +247,11 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     global cGear[c] = line gear;
     global cRpm[c] = line rpm;
     global cShift[c] = line shift;
+    if (line throttle > 0 && line shift == 0) {
+        global cThr[c] = 1;
+    } else {
+        global cThr[c] = 0;
+    }
     carCollide(c);
 }
 

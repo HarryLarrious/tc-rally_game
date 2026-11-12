@@ -979,7 +979,7 @@ def write_tc_data(spec: dict) -> None:
     for key, pid in (("iChassis", "chassis"), ("iShell", "shell"), ("iCage", "cage"), ("iEngine", "engine"),
                      ("iGearbox", "gearbox"), ("iRadiator", "radiator"), ("iDriveshaft", "driveshaft"),
                      ("iDiffF", "diff_f"), ("iDiffR", "diff_r"), ("iFuel", "fuel_tank"), ("iHood", "hood"),
-                     ("iWing", "wing")):
+                     ("iWing", "wing"), ("iExhaust", "exhaust")):
         geom[key] = idx[pid]
     for n, tag in enumerate(("fl", "fr", "rl", "rr"), start=1):
         for kind in ("wheel", "upright", "arm", "spring", "halfshaft"):

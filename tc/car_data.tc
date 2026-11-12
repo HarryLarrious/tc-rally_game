@@ -164,6 +164,7 @@ declare global iDiffR: num;
 declare global iFuel: num;
 declare global iHood: num;
 declare global iWing: num;
+declare global iExhaust: num;
 declare global iWheel1: num;
 declare global iUpright1: num;
 declare global iArm1: num;
@@ -222,6 +223,7 @@ function loadCarGeom {
     global iFuel = 31;
     global iHood = 19;
     global iWing = 24;
+    global iExhaust = 32;
     global iWheel1 = 37;
     global iUpright1 = 34;
     global iArm1 = 33;

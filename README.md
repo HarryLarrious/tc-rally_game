@@ -11,7 +11,8 @@ separate parts, so they can be damaged and broken apart.
 | [car/](car/) | Car design: [README](car/README.md), [part list](car/PARTS.md), `parts.json` for the game code |
 | [pack/](pack/) | Resource pack (Minecraft 26.3, format 97.1), namespace `rally` |
 | [pack/src/car_parts.py](pack/src/car_parts.py) | Generates the car models, textures and part data |
-| [tc/](tc/) | Terracotta code for the plot (163352, Massive): pack, commands, car spawning; `car_data.tc` is generated |
+| [tc/](tc/) | Terracotta code for the plot (206003, Mega): pack, commands, car spawning; `car_data.tc` is generated |
+| [pack/src/engine_sound.py](pack/src/engine_sound.py) | Synthesizes the engine sound loops |
 | [tools/build_pack.py](tools/build_pack.py) | Validates, zips and publishes the pack to the `pack-dist` branch |
 | [tools/viewer/](tools/viewer/) | 3D viewer for the car models |
 
@@ -78,6 +79,28 @@ as tumbling debris; the others fail in place. Effects: engine power, lost top
 gears, axles or single wheels without drive, softer springs, punctured tires,
 missing wheels, and an engine that overheats without its radiator and smokes
 when hurt.
+
+## Engine sound
+
+The engine is a procedural 2.0 turbo inline-4, synthesized offline by
+`pack/src/engine_sound.py`: one combustion pulse fired twice per crank
+revolution in I4 order (1-3-4-2) with per-cylinder imbalance and jitter,
+through an exhaust filter and pipe resonances, with crank hum, valvetrain
+tick and turbo whistle. The result is one short clip of whole 4-cylinder
+cycles. In game (`tc/sound.tc`) the driven car plays it every tick, pitched
+to the exact rpm; the copies overlap, so the pitch follows the rpm smoothly.
+Minecraft clamps pitch to 0.5..2, and pitching far also drags the exhaust
+tone up, so the same cycle is baked at 1300, 2900 and 5800 rpm and
+crossfaded at 1900 and 4100 rpm (no clip is pitched more than about 45%). Off throttle it is quieter, with random
+anti-lag pops above 3500 rpm.
+
+To change what each combustion ("explosion") sounds like, give it any WAV:
+
+```bash
+python3 pack/src/engine_sound.py --pulse my_bang.wav --preview build/engine_sweep.wav
+```
+
+`--preview` also writes a rev sweep to listen to. Then publish the pack.
 
 ## View the car
 

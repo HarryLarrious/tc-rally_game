@@ -1,0 +1,34 @@
+{
+ "engine.hi": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/hi"
+   }
+  ]
+ },
+ "engine.lo": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/lo"
+   }
+  ]
+ },
+ "engine.mid": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/mid"
+   }
+  ]
+ },
+ "engine.pop": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/pop"
+   }
+  ]
+ }
+}

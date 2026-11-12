@@ -2,7 +2,7 @@
 
 /** The published pack (tools/build_pack.py --publish prints it). */
 function packUrl(): str {
-    return "https://raw.githubusercontent.com/HarryLarrious/tc-rally_game/pack-dist/rally-pack-f5d42f3510c2.zip";
+    return "https://raw.githubusercontent.com/HarryLarrious/tc-rally_game/pack-dist/rally-pack-df57395dcefb.zip";
 }
 
 /** Sends the resource pack to the player. */

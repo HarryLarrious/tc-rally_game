@@ -1,0 +1,51 @@
+// Engine sound (pack/src/engine_sound.py): one short clip of whole
+// inline-4 firing cycles, played every tick at the engine and pitched to the
+// exact rpm. Consecutive clips overlap, so the pitch follows the rpm in small
+// steps. The cycle is baked at three base speeds so no clip is pitched more
+// than about +-45% (pitching further drags the exhaust tone up and sounds
+// buzzy): engine.lo (1300 rpm, 2 cycles), engine.mid (2900 rpm, 5 cycles),
+// engine.hi (5800 rpm, 10 cycles), crossfaded around 1900 and 4100 rpm. Off
+// throttle the engine is quieter and pops now and then above 3500 rpm.
+
+/** Plays car c's engine for this tick. A dead engine is silent; with the
+ * exhaust torn off it is louder. */
+function engineSound(c: num) {
+    if (global cPower[c] <= 0) {
+        return;
+    }
+    line rpm = global cRpm[c];
+    line at = partWorld(c, global iEngine);
+    line gain = 1;
+    if (global cThr[c] == 0) {
+        line gain = 0.45;
+        if (line rpm > 3500 && num.randomd(0, 1) < 0.08) {
+            allPlayers.playSound(csnd("rally:engine.pop", num.randomd(0.85, 1.15), 0.8), line at);
+        }
+    }
+    if (partHealth(c, global iExhaust) <= 0) {
+        line gain = line gain * 1.5;
+    }
+    // Crossfade lo -> mid around 1900 rpm and mid -> hi around 4100 rpm.
+    line up1 = num.clamp((line rpm - 1700) / 400, 0, 1);
+    line up2 = num.clamp((line rpm - 3900) / 400, 0, 1);
+    if (line up1 < 1) {
+        engineClip("lo", 1300, 2, line rpm, line at, line gain * (1 - line up1));
+    }
+    if (line up1 > 0 && line up2 < 1) {
+        engineClip("mid", 2900, 5, line rpm, line at, line gain * line up1 * (1 - line up2));
+    }
+    if (line up2 > 0) {
+        engineClip("hi", 5800, 10, line rpm, line at, line gain * line up2);
+    }
+}
+
+/** Plays engine clip `name` (baked at `base` rpm, `cycles` engine cycles
+ * long) pitched to `rpm`. Its volume allows for how many copies of it
+ * overlap at that pitch, so the sum stays about as loud at any rpm. */
+function engineClip(name: str, base: num, cycles: num, rpm: num, at: loc, gain: num) {
+    line pitch = num.clamp(rpm / base, 0.5, 2);
+    // Copies alive at once: clip length (cycles * 120 / base s) / pitch / 0.05 s.
+    line overlap = cycles * 2400 / base / line pitch;
+    line vol = num.min(1, 0.75 / num.root(line overlap * 0.375)) * gain;
+    allPlayers.playSound(csnd("rally:engine." + name, line pitch, line vol), at);
+}
