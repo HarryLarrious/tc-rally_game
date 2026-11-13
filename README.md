@@ -45,6 +45,8 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | `@dbg` | Toggle the physics debug readout in the action bar |
 | `@damage` | List the damaged parts of your car (or the nearest) |
 | `@hit PART AMOUNT` | Damage one part, e.g. `@hit bumper_f 50` (ids in [car/PARTS.md](car/PARTS.md)) |
+| `@track build` | Build the rally test track with its start line at your feet, heading your way (about 85 x 70 blocks) |
+| `@track clear` | Put grass back over the track's footprint |
 | `@fix` | Repair your car (or the nearest): fresh parts, full HP, back on its wheels |
 | `@part <id> [turn]` | Spawn one part only, to check its model |
 | `@carcheck` | List the newest car's parts that have no display |
@@ -61,7 +63,10 @@ The physics (`tc/physics.tc`) is one rigid body per car, stepped once per
 tick: ray-cast spring-damper suspension per wheel, tires capped by a friction
 circle that depends on the surface block, a torque curve with a six-speed
 automatic and 40/60 four-wheel drive, and probe points that push the body out
-of blocks. All rigid parts share one display matrix (`tc/render.tc`), so a
+of blocks. Each wheel samples the ground under the hub and 0.45 m ahead and
+behind, so a step ahead reads as a ramp and the car climbs half-block slabs;
+body probes ride up onto anything with free space 0.6 m above it and only
+stop at full-height walls. All rigid parts share one display matrix (`tc/render.tc`), so a
 driven car costs about 5% plot CPU.
 
 DiamondFire numbers keep 3 decimals, so the physics works per unit mass

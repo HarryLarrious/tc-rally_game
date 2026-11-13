@@ -56,6 +56,9 @@ declare global wComp: list[num];
 declare global wSpin: list[num];
 declare global wMu: list[num];
 declare global wSlide: list[num];
+/** Per wheel: how far past full bump (m) the ground pushed it this tick (a
+ * step); the body is lifted by this instead of by the spring. */
+declare global wExcess: list[num];
 /** Number of cars. */
 declare global carCount: num;
 
@@ -133,6 +136,7 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
         global wSpin.append(0);
         global wMu.append(0.9);
         global wSlide.append(0);
+        global wExcess.append(0);
     }
     if (global gParts == 0) {
         loadCarGeom();
@@ -278,6 +282,7 @@ function clearCars {
     global wSpin = [];
     global wMu = [];
     global wSlide = [];
+    global wExcess = [];
     global carCount = 0;
 }
 

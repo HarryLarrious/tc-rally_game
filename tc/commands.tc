@@ -43,6 +43,8 @@ playerevent command {
             fixCar(line c);
             default.sendMessage(s"<gray>Car %var(c) repaired.");
         }
+    } else if (line cmd == "track") {
+        trackCommand(line words);
     } else if (line cmd == "dbg") {
         global dbg = 1 - global dbg;
     } else if (line cmd == "tune") {
@@ -56,7 +58,7 @@ playerevent command {
     } else if (line cmd == "pack") {
         packSend();
     } else {
-        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
+        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@track build|clear</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
     }
 }
 

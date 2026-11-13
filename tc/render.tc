@@ -79,7 +79,8 @@ function renderCorner(c: num, i: num, move: list, links: num, steer: num, L: vec
     if (line side < 0) {
         line psi += 180;
     }
-    line hubY = 0.2 + global wComp[line k];
+    // Past full bump (riding up a step) the wheel stays at full bump.
+    line hubY = 0.2 + num.min(global wComp[line k], 0.24);
     if (global wComp[line k] == 0) {
         line hubY = 0.2;
     }

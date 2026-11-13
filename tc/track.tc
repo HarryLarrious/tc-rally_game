@@ -1,0 +1,191 @@
+// A rally test track, built by code from where the player stands.
+//
+// @track build lays it out with its start line at the player's feet, heading
+// the way they face (snapped to the nearest axis). @track clear puts grass
+// back over its footprint. The loop is about 75 x 60 blocks:
+//   start straight (asphalt) -> gravel sweeper climbing half-slab steps to a
+//   2-block crest -> drop (jump) -> dirt hairpin -> slab staircase up and
+//   down -> snow patch -> gravel back to the start.
+//
+// The road is stamped square by square along the waypoints, a few per tick
+// so the plot CPU stays low. Heights are in half blocks: odd heights end in
+// a slab, so the road has the half-block steps the car must climb.
+
+/** Track anchor (block below the start line), forward and right axes. */
+declare saved trackAt: vec;
+declare saved trackF: vec;
+declare saved trackR: vec;
+/** 1 while a build or clear is running. */
+declare global trackBusy: num;
+
+/** Waypoints: forward, right (blocks), height (half blocks), surface. */
+function trackPoints(): list {
+    return [
+        [0, 0, 0, "gray_concrete"],
+        [36, 0, 0, "gray_concrete"],
+        [46, 3, 0, "gravel"],
+        [53, 10, 1, "gravel"],
+        [57, 19, 2, "gravel"],
+        [58, 28, 3, "gravel"],
+        [56, 36, 4, "gravel"],
+        [53, 40, 4, "gravel"],
+        [47, 46, 0, "gravel"],
+        [40, 53, 0, "coarse_dirt"],
+        [31, 57, 0, "coarse_dirt"],
+        [23, 54, 0, "coarse_dirt"],
+        [17, 47, 0, "coarse_dirt"],
+        [12, 44, 1, "andesite"],
+        [7, 44, 2, "andesite"],
+        [2, 44, 3, "andesite"],
+        [-3, 44, 2, "andesite"],
+        [-8, 44, 1, "andesite"],
+        [-13, 43, 0, "snow_block"],
+        [-18, 36, 0, "snow_block"],
+        [-20, 26, 0, "snow_block"],
+        [-18, 15, 0, "gravel"],
+        [-12, 5, 0, "gravel"],
+        [-5, 1, 0, "gravel"],
+        [0, 0, 0, "gray_concrete"]
+    ];
+}
+
+/** Road width in blocks (each stamp is width x width). */
+function trackWidth(): num {
+    return 7;
+}
+
+/** World block location of track point (f, r) at layer y above the anchor. */
+function trackLoc(f: num, r: num, y: num): loc {
+    line p = saved trackAt + saved trackF * f + saved trackR * r;
+    return loc(num.floor(line p.x), saved trackAt.y + y, num.floor(line p.z));
+}
+
+/** Sets the track frame from the player: anchor under their feet, facing
+ * snapped to the nearest axis. */
+function trackFromPlayer {
+    line feet = default.location;
+    line yaw: num = line feet.getCoordinate(coord="Yaw");
+    line snap = num.round(line yaw / 90) * 90;
+    line F = vec(num.round(0 - num.sin(line snap)), 0, num.round(num.cos(line snap)));
+    // Right of facing: F x up.
+    line R = line F.cross(vec(0, 1, 0));
+    saved trackAt = vec(num.floor(line feet.x), num.floor(line feet.y) - 1, num.floor(line feet.z));
+    saved trackF = line F;
+    saved trackR = line R;
+}
+
+/** One road stamp centered on (f, r) at height h (half blocks). */
+function trackStamp(f: num, r: num, h: num, surface: str) {
+    line half = num.floor(trackWidth() / 2);
+    line full = num.floor(h / 2);
+    line slab = h - line full * 2;
+    line a = saved trackAt + saved trackF * (f - line half) + saved trackR * (r - line half);
+    line b = saved trackAt + saved trackF * (f + line half) + saved trackR * (r + line half);
+    line x0 = num.floor(num.min(line a.x, line b.x));
+    line x1 = num.floor(num.max(line a.x, line b.x));
+    line z0 = num.floor(num.min(line a.z, line b.z));
+    line z1 = num.floor(num.max(line a.z, line b.z));
+    line y0 = saved trackAt.y;
+    // Body under the road, then the road surface, then air above it.
+    if (line full >= 1) {
+        game.setRegion(item("stone"), loc(line x0, line y0, line z0), loc(line x1, line y0 + line full - 1, line z1));
+    }
+    game.setRegion(item(surface), loc(line x0, line y0 + line full, line z0), loc(line x1, line y0 + line full, line z1));
+    if (line slab == 1) {
+        game.setRegion(item("andesite_slab"), loc(line x0, line y0 + line full + 1, line z0), loc(line x1, line y0 + line full + 1, line z1), "type=bottom");
+        game.setRegion(item("air"), loc(line x0, line y0 + line full + 2, line z0), loc(line x1, line y0 + line full + 5, line z1));
+    } else {
+        game.setRegion(item("air"), loc(line x0, line y0 + line full + 1, line z0), loc(line x1, line y0 + line full + 5, line z1));
+    }
+}
+
+/** @track build: lays the track out from the player, a few stamps a tick. */
+process trackBuild {
+    global trackBusy = 1;
+    line pts = trackPoints();
+    line n = 0;
+    repeat (line i to line pts.len() - 1) {
+        line p = line pts[line i] as list;
+        line q = line pts[line i + 1] as list;
+        line pf = line p[1] as num;
+        line pr = line p[2] as num;
+        line dfw = (line q[1] as num) - line pf;
+        line drt = (line q[2] as num) - line pr;
+        line len = num.max(1, num.round(num.root(line dfw * line dfw + line drt * line drt)));
+        repeat (line s to line len) {
+            line t = (line s - 1) / line len;
+            line h = num.round((line p[3] as num) + ((line q[3] as num) - (line p[3] as num)) * line t);
+            trackStamp(line pf + line dfw * line t, line pr + line drt * line t, line h, line p[4] as str);
+            line n += 1;
+            if (line n % 4 == 0) {
+                wait;
+            }
+        }
+    }
+    // Checkered start line across the road at f = 2.
+    line half = num.floor(trackWidth() / 2);
+    repeat (line j to trackWidth()) {
+        line r = line j - 1 - line half;
+        line col = "white_concrete";
+        if (line j % 2 == 0) {
+            line col = "black_concrete";
+        }
+        game.setBlock(item(line col), trackLoc(2, line r, 0));
+        game.setBlock(item(line col), trackLoc(3, line r + 1, 0));
+    }
+    global trackBusy = 0;
+    allPlayers.sendMessage(s"<gray>Track built. Start line is where you stood; <yellow>@car</yellow> there and go.");
+}
+
+/** @track clear: grass over the footprint, air above it. */
+process trackClear {
+    global trackBusy = 1;
+    line half = num.floor(trackWidth() / 2) + 1;
+    // Footprint in track coordinates (from trackPoints), with a margin.
+    line f0 = -24 - line half;
+    line f1 = 62 + line half;
+    line r0 = -2 - line half;
+    line r1 = 60 + line half;
+    line f = line f0;
+    while (line f <= line f1) {
+        line fe = num.min(line f + 7, line f1);
+        line a = saved trackAt + saved trackF * line f + saved trackR * line r0;
+        line b = saved trackAt + saved trackF * line fe + saved trackR * line r1;
+        line x0 = num.floor(num.min(line a.x, line b.x));
+        line x1 = num.floor(num.max(line a.x, line b.x));
+        line z0 = num.floor(num.min(line a.z, line b.z));
+        line z1 = num.floor(num.max(line a.z, line b.z));
+        line y0 = saved trackAt.y;
+        game.setRegion(item("air"), loc(line x0, line y0 + 1, line z0), loc(line x1, line y0 + 6, line z1));
+        game.setRegion(item("grass_block"), loc(line x0, line y0, line z0), loc(line x1, line y0, line z1));
+        line f += 8;
+        wait;
+    }
+    global trackBusy = 0;
+    allPlayers.sendMessage(s"<gray>Track cleared.");
+}
+
+/** @track build | clear. */
+function trackCommand(words: list) {
+    if (global trackBusy == 1) {
+        default.sendMessage(s"<gray>The track is still being built or cleared.");
+        return;
+    }
+    line what = "";
+    if (words.len() >= 2) {
+        line what = words[2] as str;
+    }
+    if (line what == "build") {
+        trackFromPlayer();
+        default.sendMessage(s"<gray>Building the track ahead of you (about 75 x 60 blocks)...");
+        start trackBuild;
+    } else if (line what == "clear") {
+        if (saved trackF.len() < 0.5) {
+            default.sendMessage(s"<gray>No track has been built here.");
+            return;
+        }
+        start trackClear;
+    } else {
+        default.sendMessage(s"<gray>Usage: <yellow>@track build</yellow> (start line at your feet, facing your way) or <yellow>@track clear</yellow>.");
+    }
+}

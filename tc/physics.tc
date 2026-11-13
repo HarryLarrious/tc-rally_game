@@ -66,11 +66,6 @@ function loadProbes {
         global gProbes.append(vec(line x as num, 0.65, 0.3) - line com);
         global gProbes.append(vec(line x as num, 0.65, -0.9) - line com);
     }
-    for (line x of [0.9, -0.9]) {
-        for (line z of [1.25, -1.25]) {
-            global gProbes.append(vec(line x as num, 0.32, line z as num) - line com);
-        }
-    }
 }
 
 /** Grip per surface. Asphalt-like blocks 1.0, gravel 0.7, grass 0.6, snow 0.4,
@@ -83,7 +78,8 @@ function loadSurfaces {
         gravel: 0.7, coarse_dirt: 0.72, dirt: 0.75, rooted_dirt: 0.72, dirt_path: 0.8, podzol: 0.68,
         grass_block: 0.62, mycelium: 0.6, moss_block: 0.55, farmland: 0.6, clay: 0.6, mud: 0.45,
         sand: 0.5, red_sand: 0.5, soul_sand: 0.4, snow_block: 0.4, snow: 0.4, powder_snow: 0.3,
-        ice: 0.12, packed_ice: 0.1, blue_ice: 0.08, terracotta: 0.85, red_terracotta: 0.85
+        ice: 0.12, packed_ice: 0.1, blue_ice: 0.08, andesite_slab: 0.95, smooth_stone_slab: 1.0,
+        white_concrete: 1.05, black_concrete: 1.05, terracotta: 0.85, red_terracotta: 0.85
     };
 }
 
@@ -232,6 +228,31 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     line tf = line torque.dot(line F) * line m / 550;
     line w = (line w + (line L * line tl + line U * line tu + line F * line tf) * line dt) * 0.995;
     line pos = line pos + line vel * line dt;
+    // Wheels on a step: lift the body there directly and stop that point
+    // sinking, with no rebound (a spring pushing the body up would launch it).
+    repeat (line i to 4) {
+        line e = global wExcess[(c - 1) * 4 + line i];
+        if (line e > 0.005) {
+            line side = 1;
+            if (line i % 2 == 0) {
+                line side = -1;
+            }
+            line z = global gAxleR;
+            if (line i <= 2) {
+                line z = global gAxleF;
+            }
+            line r = line L * (line side * global gTrackX - line com.x) + line U * (0.24 + line e - 0.12 - line com.y) + line F * (line z - line com.z);
+            line vn = (line vel + line w.cross(line r)).dot(line U);
+            if (line vn < 0) {
+                line mi = line m / 1500;
+                line rn = line r.cross(line U);
+                line j = 0 - line vn / (1 + line rn.dot(line rn) * line mi);
+                line vel = line vel + line U * line j;
+                line w = line w + line rn * (line j * line mi);
+            }
+            line pos = line pos + line U * (line e * 0.5);
+        }
+    }
     line F = (line F + line w.cross(line F) * line dt).setLength(1);
     line U = line U + line w.cross(line U) * line dt;
     line L = line U.cross(line F).setLength(1);
@@ -273,7 +294,30 @@ function carCollide(c: num) {
         line r = line L * line pv.x + line U * line pv.y + line F * line pv.z;
         line p = line pos + line r;
         line blk = game.getBlockMaterial(loc(line p.x, line p.y, line p.z), returnValue="Item");
+        line touching = 0;
+        line n = vec(0, 1, 0);
+        line depth = 0;
         if (line blk.isSolid()) {
+            // The cell counts as solid for a slab too, so find the real top
+            // of what is in it: cast down from the cell's top face onto the
+            // block's actual shape. A solid cell above it is a wall.
+            line cy = num.floor(line p.y);
+            line above = game.getBlockMaterial(loc(line p.x, line cy + 1.5, line p.z), returnValue="Item");
+            if (line above.isSolid()) {
+                line touching = 2;
+            } else {
+                line hit = game.raycast(loc(line p.x, line cy + 1.001, line p.z, 90, 0), 1.0, blockCollision="Solid blocks");
+                line depth = line hit.y - line p.y;
+                if (line depth > 0.6) {
+                    // Too tall to ride up onto: a wall.
+                    line touching = 2;
+                } else if (line depth > 0.005) {
+                    // A step (slab, stair, low block): ride up onto it.
+                    line touching = 1;
+                }
+            }
+        }
+        if (line touching == 2) {
             // Push out through the nearest face of the block.
             line fx = line p.x - num.floor(line p.x);
             line fy = line p.y - num.floor(line p.y);
@@ -300,6 +344,8 @@ function carCollide(c: num) {
                 line n = vec(0, 0, 1);
                 line depth = 1 - line fz;
             }
+        }
+        if (line touching > 0) {
             line vp = line vel + line w.cross(line r);
             line vn = line vp.dot(line n);
             if (line vn < 0) {
@@ -350,6 +396,7 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     if (global wGone[line k] == 1) {
         global wComp[line k] = 0;
         global wSlide[line k] = 0;
+        global wExcess[line k] = 0;
         return [vec(0, 0, 0), vec(0, 0, 0)];
     }
     line side = 1;
@@ -361,21 +408,47 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     if (line front) {
         line z = global gAxleF;
     }
-    line ml = vec(line side * global gTrackX - line com.x, 0.44 - line com.y, line z - line com.z);
-    line mount = line pos + line L * line ml.x + line U * line ml.y + line F * line ml.z;
-    line hit = game.raycast(loc(line mount.x, line mount.y, line mount.z).setDirection(line U * -1), 0.56, blockCollision="Solid blocks");
-    line hv = vec(line hit.x, line hit.y, line hit.z);
-    line d = (line hv - line mount).len();
-    if (line d < 0.555) {
-        line comp = 0.56 - line d;
+    // Ground under the wheel, sampled under the hub and 0.45 m ahead and
+    // behind from 1.05 m up (car frame). A sample off the hub counts lower by
+    // 0.55 per meter, so a step ahead reads as a ramp and the suspension lifts
+    // the wheel onto it before the hub reaches the edge.
+    line down = line U * -1;
+    line ground = -9;
+    for (line dzv of [0, 0.45, -0.45]) {
+        line dz = line dzv as num;
+        line ml = vec(line side * global gTrackX - line com.x, 1.05 - line com.y, line z + line dz - line com.z);
+        line top = line pos + line L * line ml.x + line U * line ml.y + line F * line ml.z;
+        line hit = game.raycast(loc(line top.x, line top.y, line top.z).setDirection(line down), 1.17, blockCollision="Solid blocks");
+        line d = (vec(line hit.x, line hit.y, line hit.z) - line top).len();
+        if (line d < 1.165) {
+            line ground = num.max(line ground, 1.05 - line d - 0.55 * num.abs(line dz));
+        }
+    }
+    // A real wheel climbs a step along its edge, so the ground it feels may
+    // rise only as fast as rolling up a 0.9 slope (plus a little): a step
+    // is taken over a few ticks instead of in one jolt.
+    if (global wComp[line k] > 0) {
+        line rise = 0.02 + num.abs(vel.dot(F)) * line dt * 0.9;
+        line ground = num.min(line ground, global wComp[line k] - 0.12 + line rise);
+    }
+    // Compression from full droop (wheel bottom at -0.12); 0.24 is full bump.
+    if (line ground > -0.12) {
+        // Past full bump (0.24) the wheel is on a step: the spring stops
+        // there, and carStep lifts the body by the rest (wExcess).
+        global wExcess[line k] = num.max(0, line ground + 0.12 - 0.24);
+        line comp = num.min(line ground + 0.12, 0.24);
+        line cl = vec(line side * global gTrackX - line com.x, line ground - line com.y, line z - line com.z);
+        line hv = line pos + line L * line cl.x + line U * line cl.y + line F * line cl.z;
         line cvel = (line comp - global wComp[line k]) / line dt;
-        line fs = global tSpring * global wSpringF[line k] * line comp + global tDamper * line cvel;
+        // The damper blows off above 1.5 m/s, so a sudden step cannot kick.
+        line fs = global tSpring * global wSpringF[line k] * line comp + global tDamper * num.clamp(line cvel, -1.5, 1.5);
         if (line comp > 0.21) {
-            line fs += 150000 * (line comp - 0.21);
+            // Bump stop. Past full bump (a step) it keeps pushing the body up.
+            line fs += 40000 * (line comp - 0.21);
             // Slamming into the bump stop hurts the spring and the arm.
-            if (line cvel > 2.5 && global cGrace[c] == 0) {
-                partDamage(c, [global iSpring1, global iSpring2, global iSpring3, global iSpring4][i] as num, (line cvel - 2.5) * 12);
-                partDamage(c, [global iArm1, global iArm2, global iArm3, global iArm4][i] as num, (line cvel - 2.5) * 6);
+            if (line cvel > 6 && global cGrace[c] == 0) {
+                partDamage(c, [global iSpring1, global iSpring2, global iSpring3, global iSpring4][i] as num, (line cvel - 6) * 12);
+                partDamage(c, [global iArm1, global iArm2, global iArm3, global iArm4][i] as num, (line cvel - 6) * 6);
             }
         }
         line fs = num.max(0, line fs);
@@ -451,6 +524,7 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     }
     global wComp[line k] = 0;
     global wSlide[line k] = 0;
+    global wExcess[line k] = 0;
     return [vec(0, 0, 0), vec(0, 0, 0)];
 }
 
