@@ -100,6 +100,43 @@ function engineTorque(rpm: num): num {
     return num.max(150, 500 * (1 - 0.45 * line dev * line dev));
 }
 
+/** Gearbox mode per player uuid: 1 manual (left click up, right click
+ * down), 0 or missing auto. */
+declare saved gearMode: dict[num];
+
+/** 1 when player uuid drives with the manual gearbox. */
+function gearManual(uuid: str): num {
+    if (uuid != "" && saved gearMode.hasKeys(uuid)) {
+        return saved gearMode[uuid];
+    }
+    return 0;
+}
+
+/** Manual gearbox: shifts the player's car up (dir 1) or down (dir -1).
+ * Up from reverse goes to first; there is no neutral. */
+function shiftGear(dir: num) {
+    line c = carOf(default.uuid);
+    if (line c == 0 || gearManual(default.uuid) == 0) {
+        return;
+    }
+    line g = global cGear[line c];
+    line top = num.min(6, global cGearMax[line c]);
+    line was = line g;
+    if (dir > 0) {
+        if (line g == -1) {
+            line g = 1;
+        } else if (line g < line top) {
+            line g += 1;
+        }
+    } else if (line g > 1) {
+        line g -= 1;
+    }
+    if (line g != line was) {
+        global cGear[line c] = line g;
+        global cShift[line c] = 3;
+    }
+}
+
 /** Gear ratio of gear g (-1 = reverse). */
 function gearRatio(g: num): num {
     if (g == -1) {
@@ -155,32 +192,36 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     // Redline 7500, limiter 7800.
     line ratio = gearRatio(line gear);
     line road = line speed / global gWheelR * 9.549 * line ratio * 4.1;
+    // A tire past its grip under power spins, whether it slides along the
+    // wheel or sideways (a drift).
     line spinning = 0;
     repeat (line i to 4) {
-        if (global wSlide[(c - 1) * 4 + line i] == 1) {
+        if (global wSlide[(c - 1) * 4 + line i] >= 1) {
             line spinning += 1;
         }
     }
     line rpm = line road;
-    if (line throttle > 0 && line spinning >= 2) {
-        // Spinning tires let the engine run up to 2500 over road speed.
-        line spinTo = num.min(line road + 2500, 7600);
-        line rpm = num.max(line rpm, global cRpm[c] + (line spinTo - global cRpm[c]) * 0.3);
+    if (line throttle > 0 && line spinning >= 1) {
+        // No traction control: spinning tires let the engine rev freely into
+        // the limiter (torque cuts above 7800, so it bounces there).
+        line rpm = num.max(line rpm, global cRpm[c] + (8000 - global cRpm[c]) * 0.3);
     }
     if (line throttle > 0) {
         line rpm = num.max(line rpm, 2600);
     }
     line rpm = num.max(900, global cRpm[c] * 0.4 + line rpm * 0.6);
-    // Automatic gearbox: shifts on road speed (not wheelspin), up a little
-    // before the redline, down when it would bog.
+    // Gearbox. Auto (the default) shifts up as the engine nears the redline,
+    // wheelspin included, and down when it would bog, but not while the
+    // tires spin (that would hunt between gears). Manual (gearMode 1, set
+    // in the menu) only shifts on the driver's clicks (shiftGear).
     line shift = global cShift[c];
     if (line shift > 0) {
         line shift -= 1;
-    } else if (line gear >= 1) {
-        if (line road > 6900 && line gear < 6) {
+    } else if (line gear >= 1 && gearManual(global cDriver[c]) == 0) {
+        if ((line rpm > 7200 || line road > 6900) && line gear < 6) {
             line gear += 1;
             line shift = 4;
-        } else if (line road < 3000 && line gear > 1) {
+        } else if (line road < 3000 && line gear > 1 && line spinning == 0) {
             line gear -= 1;
             line shift = 3;
         }
@@ -193,6 +234,12 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     line drive = 0;
     if (line shift == 0 && global cGearMax[c] > 0) {
         line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c];
+    }
+    // Limiter: above 7800 the fuel is cut (no torque this tick) and the revs
+    // drop, so an engine revving on spinning tires bounces off it instead
+    // of staying there with no power.
+    if (line rpm > 7800) {
+        line rpm = 7300;
     }
     // No radiator: the engine overheats under throttle. A hurt engine smokes.
     if (global rTick % 20 == 0) {
@@ -502,9 +549,39 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
             if (num.abs(line fx) > num.abs(line fy)) {
                 line slide = 1;
             }
-            line scale = line fmax * 0.9 / line mag;
-            line fx = line fx * line scale;
-            line fy = line fy * line scale;
+            line fm = line fmax * 0.9;
+            // A driven tire spinning under power pushes along its slip: the
+            // wheel's spin speed (from engine rpm) against the ground, and
+            // the sideways slide. So power still drives the car in a drift
+            // and more wheelspin means less side grip. Never more drive than
+            // the engine gives.
+            line sx = 0;
+            if (throttle > 0 && drive != 0 && global wDrive[line k] > 0 && !(hand > 0 && !line front)) {
+                line gr = gearRatio(global cGear[c]);
+                line vw = global cRpm[c] / (line gr * 4.1) / 9.549 * global gWheelR;
+                if (drive < 0) {
+                    line vw = 0 - line vw;
+                }
+                line sx = line vw - line vlong;
+                if (line sx * drive <= 0) {
+                    line sx = 0;
+                }
+            }
+            if (line sx != 0) {
+                line sl = num.root(line sx * line sx + line vlat * line vlat);
+                line fxs = line fm * line sx / line sl;
+                if (num.abs(line fxs) < num.abs(line fx)) {
+                    line fx = line fxs;
+                }
+                line fys = 0 - line fm * line vlat / line sl;
+                if (num.abs(line fys) < num.abs(line fy)) {
+                    line fy = line fys;
+                }
+            } else {
+                line scale = line fm / line mag;
+                line fx = line fx * line scale;
+                line fy = line fy * line scale;
+            }
         }
         // As acceleration (per unit car mass): DF numbers keep 3 decimals, so
         // never multiply by 1 / mass.

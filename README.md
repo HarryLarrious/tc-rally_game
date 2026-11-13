@@ -39,6 +39,7 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 
 | Command | Effect |
 | --- | --- |
+| `@menu` | Open the service board (also: right click the Roadbook in hotbar slot 1) |
 | `@start` | Put a car before the stage start line with you in it; the clock runs from the start line to the finish |
 | `@map build [X0 Z0 X1 Z1]` | Build the whole map (or only that plot-space area); `@map terrain\|road\|structs\|props\|decor\|wipe [area]` builds one phase, `@map stop` stops |
 | `@tp X Y Z [YAW [PITCH]]` | Teleport in plot space (what the code uses: x and z from the plot corner) |
@@ -107,12 +108,29 @@ saved.
 
 W throttle, S brake (reverse once stopped), A/D steer, hold Shift for the
 handbrake, F to get out, Q to put the car back on its wheels. The action bar
-shows speed, gear, rpm and plot CPU.
+shows speed, gear (`M3` = third with the manual gearbox), rpm and plot CPU.
+
+The gearbox is set per player in the menu. Auto shifts up as the engine nears
+the redline (wheelspin included) and down when it would bog, but not while the
+tires spin. Manual shifts only on clicks: left click up, right click down.
+There is no traction control: spinning or sliding tires rev the engine into
+the 7800 rpm limiter, which cuts the power for a tick and drops the revs.
+
+## Menu
+
+`tc/menu.tc` draws the service board: like the dueling game's menus, the
+player sits on a seat while it is open and the screen is made of text
+displays, but here they form a flat board in the world (no shader), so the
+crosshair is the cursor. Panels are text displays holding one space with a
+colored background, scaled to size; buttons light up yellow under the
+crosshair. Left click picks, right click or Shift closes. The board holds
+the gearbox choice, the stage record with a start button, and spawn car.
+Only the player who opened it sees it.
 
 The physics (`tc/physics.tc`) is one rigid body per car, stepped once per
 tick: spring-damper suspension per wheel, tires capped by a friction
 circle that depends on the surface block, a torque curve with a six-speed
-automatic and 40/60 four-wheel drive, and probe points that push the body out
+gearbox and 40/60 four-wheel drive, and probe points that push the body out
 of blocks. The ground is smoothed (`tc/ground.tc`): each block column's
 surface height is averaged over the 10 x 10 columns around it (`@tune smooth
 N` sets the half-width), so a one-block step or a slab is a ramp about 10

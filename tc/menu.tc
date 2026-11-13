@@ -1,0 +1,406 @@
+// The menu: a service board in front of the player. Like the dueling game's
+// menus, the player sits on a seat while it is open and the screen is a set
+// of text displays; here they are a flat board in the world (no shader), so
+// the crosshair is the cursor. Look at a button and left click it; right
+// click or Shift closes the menu.
+//
+// Look: dark panels, a rally-yellow header with a red and white curb stripe
+// under it, buttons that light up yellow under the crosshair, the chosen
+// option in white.
+//
+// The board is D blocks ahead of the eye, facing the player. Board
+// coordinates are in blocks from its center: x right, y up. A panel is a
+// text display holding one space with a colored background, scaled to size
+// (a space's background is 5 x 10 font pixels, 0.025 blocks each, drawn
+// from the display's origin up and 0.5 pixel right of center).
+
+/** Open menus: uuid -> {seat, eye (vec), f, r (vec: forward and right),
+ * widgets (list of dicts), hover (button id)}. */
+declare global menuOf: dict;
+
+/** Angle a in degrees, wrapped into -180..180. */
+function menuWrap(a: num): num {
+    return ((a + 180) % 360 + 360) % 360 - 180;
+}
+
+/** Distance from the eye to the board. */
+function menuDist(): num {
+    return 2.0;
+}
+
+/** Rally yellow. */
+function menuYellow(): str {
+    return "#FFC20E";
+}
+
+/** World position of board point (x, y), `layer` blocks behind the board
+ * (negative = in front). */
+function menuAt(st: dict, x: num, y: num, layer: num): vec {
+    return (st["eye"] as vec) + (st["f"] as vec) * (menuDist() + layer) + (st["r"] as vec) * x + vec(0, y, 0);
+}
+
+/** Spawns a display at world point p facing the player; returns its uuid. */
+function menuSpawn(st: dict, p: vec, text: txt): str {
+    game.spawnTextDisplay(loc(p.x, p.y, p.z), text);
+    line ent = lastEntity.uuid;
+    // Facing the player: their yaw turned around, kept in -180..180. The
+    // spawn location's rotation is not used, so set it here.
+    lastEntity.setRotation(0, menuWrap(st["yaw"] as num + 180));
+    lastEntity.setDisplayBillboard(type="Fixed");
+    lastEntity.setTextDisplayTextShadow(textShadow="Disable");
+    lastEntity.setDisplayBrightness(15, 15);
+    lastEntity.setTextDisplayBackground("#000000", 0);
+    // Only the player in the menu sees it.
+    select !playersByName(default.uuid);
+    selected.setEntityHidden([line ent], hidden="Enable");
+    select reset;
+    return line ent;
+}
+
+/** A w x h panel of color (hex) at opacity (%) centered on board (x, y). */
+function menuRect(st: dict, x: num, y: num, w: num, h: num, color: str, opacity: num, layer: num): str {
+    line sx = w / 0.125;
+    line sy = h / 0.25;
+    line ent = menuSpawn(st, menuAt(st, x - 0.0125 * line sx, y - h / 2, layer), s" ");
+    select entitiesByName(line ent);
+    selectedEntity.setTextDisplayBackground(color, opacity);
+    selectedEntity.setDisplayScale(line sx, line sy, 1);
+    select reset;
+    return line ent;
+}
+
+/** Styled menu text: style "title" (black, bold), "button" (light, bold),
+ * "dark" (black, bold, on a lit button), "label" (yellow, bold), "body"
+ * (light gray), "dim" (gray). */
+function menuStyle(t: str, style: str): txt {
+    if (style == "title" || style == "dark") {
+        return s"<black><b>%var(t)</b></black>";
+    }
+    if (style == "button") {
+        return s"<#E8E8E8><b>%var(t)</b></#E8E8E8>";
+    }
+    if (style == "label") {
+        return s"<#FFC20E><b>%var(t)</b></#FFC20E>";
+    }
+    if (style == "dim") {
+        return s"<#8A8F98>%var(t)</#8A8F98>";
+    }
+    return s"<#D0D3D8>%var(t)</#D0D3D8>";
+}
+
+/** Text at scale `size` centered on board (x, y). */
+function menuText(st: dict, x: num, y: num, t: str, style: str, size: num): str {
+    line ent = menuSpawn(st, menuAt(st, x - 0.0125 * size, y - 0.1375 * size, -0.01), menuStyle(t, style));
+    select entitiesByName(line ent);
+    selectedEntity.setDisplayScale(size, size, 1);
+    selectedEntity.setTextDisplayLineWidth(2000);
+    select reset;
+    return line ent;
+}
+
+/** Board widgets. A button is {kind: "button", id, x, y, w, h, text, size,
+ * action, bg, lbl}; a text that changes is {kind: "text", id, ent}. */
+function menuButton(st: dict, id: str, x: num, y: num, w: num, h: num, t: str, size: num, action: str): dict {
+    line bg = menuRect(st, x, y, w, h, "#2B2F36", 100, 0);
+    line lbl = menuText(st, x, y, t, "button", size);
+    return {kind: "button", id: id, x: x, y: y, w: w, h: h, text: t, size: size, action: action, bg: line bg, lbl: line lbl};
+}
+
+/** 1 when button id shows a chosen option for the player. */
+function menuChosen(id: str): num {
+    line manual = gearManual(default.uuid);
+    if ((id == "gear_auto" && line manual == 0) || (id == "gear_manual" && line manual == 1)) {
+        return 1;
+    }
+    return 0;
+}
+
+/** Colors button w: lit (yellow) under the crosshair, white when chosen,
+ * dark otherwise. */
+function menuPaint(w: dict, lit: num) {
+    line id = w["id"] as str;
+    line t = w["text"] as str;
+    select entitiesByName(w["bg"] as str);
+    if (lit == 1) {
+        selectedEntity.setTextDisplayBackground(menuYellow(), 100);
+    } else if (menuChosen(line id) == 1) {
+        selectedEntity.setTextDisplayBackground("#E9ECEF", 100);
+    } else {
+        selectedEntity.setTextDisplayBackground("#2B2F36", 100);
+    }
+    select reset;
+    select entitiesByName(w["lbl"] as str);
+    if (lit == 1 || menuChosen(line id) == 1) {
+        selectedEntity.setTextDisplayText(menuStyle(line t, "dark"));
+    } else {
+        selectedEntity.setTextDisplayText(menuStyle(line t, "button"));
+    }
+    select reset;
+}
+
+/** The gearbox note under the gearbox buttons. */
+function menuGearNote(): str {
+    if (gearManual(default.uuid) == 1) {
+        return "Left click shifts up, right click shifts down";
+    }
+    return "Shifts up near the redline, down when slow";
+}
+
+/** Builds the board for the player. */
+function menuBuild(st: dict): list {
+    line out = [];
+    // Board and header.
+    line out.append({kind: "deco", ent: menuRect(st, 0, 0, 3.2, 2.0, "#101215", 100, 0.03)});
+    line out.append({kind: "deco", ent: menuRect(st, 0, 0.88, 3.2, 0.24, menuYellow(), 100, 0.02)});
+    line out.append({kind: "deco", ent: menuText(st, -0.62, 0.88, "KESTREL RALLY", "title", 0.75)});
+    line out.append({kind: "deco", ent: menuText(st, 1.0, 0.88, "SERVICE BOARD", "title", 0.45)});
+    // Curb stripe: red and white blocks under the header. Panels never
+    // overlap at the same depth, or one can hide the other from an angle.
+    repeat (line i to 20) {
+        line col = "#F2F2F2";
+        if (line i % 2 == 1) {
+            line col = "#D8262E";
+        }
+        line out.append({kind: "deco", ent: menuRect(st, -1.6 + 0.08 + (line i - 1) * 0.16, 0.715, 0.16, 0.09, line col, 100, 0.02)});
+    }
+    // Gearbox.
+    line out.append({kind: "deco", ent: menuText(st, -1.05, 0.4, "GEARBOX", "label", 0.55)});
+    line out.append(menuButton(st, "gear_auto", 0.05, 0.4, 0.8, 0.22, "AUTO", 0.45, "gear auto"));
+    line out.append(menuButton(st, "gear_manual", 0.95, 0.4, 0.8, 0.22, "MANUAL", 0.45, "gear manual"));
+    line out.append({kind: "text", id: "gear_note", ent: menuText(st, 0.45, 0.18, menuGearNote(), "body", 0.36)});
+    // Divider.
+    line out.append({kind: "deco", ent: menuRect(st, 0, 0.0, 2.9, 0.012, "#3A3F47", 100, 0.02)});
+    // The stage.
+    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.2, "SS1 KESTREL RIDGE", "label", 0.5)});
+    line best = "No time set yet";
+    if (saved stBest > 0) {
+        line bt = stageTime(saved stBest);
+        line who = saved stBestName;
+        line best = "Best %var(bt)  by %var(who)";
+    }
+    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.38, line best, "body", 0.38)});
+    line out.append(menuButton(st, "start", 0.95, -0.29, 1.0, 0.3, "START STAGE", 0.45, "start"));
+    // Bottom row and hint.
+    line out.append(menuButton(st, "car", -0.95, -0.66, 1.0, 0.22, "SPAWN CAR", 0.42, "car"));
+    line out.append(menuButton(st, "close", 0.95, -0.66, 1.0, 0.22, "CLOSE", 0.42, "close"));
+    line out.append({kind: "deco", ent: menuText(st, 0, -0.9, "Look to aim, left click picks, right click or Shift closes", "dim", 0.3)});
+    for (line w of line out) {
+        if ((line w as dict)["kind"] as str == "button") {
+            menuPaint(line w as dict, 0);
+        }
+    }
+    return line out;
+}
+
+/** 1 while the player has the menu open. */
+function menuIsOpen(uuid: str): num {
+    if (global menuOf.hasKeys(uuid)) {
+        return 1;
+    }
+    return 0;
+}
+
+/** Opens the menu for the player (not while driving). */
+function menuOpen {
+    line uuid = default.uuid;
+    if (menuIsOpen(line uuid) == 1) {
+        return;
+    }
+    if (carOf(line uuid) != 0) {
+        default.sendMessage(s"<gray>Get out of the car (<yellow>F</yellow>) to open the menu.");
+        return;
+    }
+    line me = default.location;
+    // Minecraft yaw is not wrapped (it can be 400 or -900).
+    line yaw = menuWrap(line me.getCoordinate(coord="Yaw"));
+    game.spawnInteractionEntity(loc(line me.x, line me.y, line me.z), 0.6, 0.6);
+    line seat = lastEntity.uuid;
+    default.rideEntity(line seat);
+    default.setRotation(0, line yaw);
+    default.setHotbarSlot(1);
+    // Let the riding pose settle before reading the eye position.
+    wait(2);
+    line eye = default.eyeLocation;
+    line st = {
+        seat: line seat,
+        yaw: line yaw,
+        eye: vec(line eye.x, line eye.y, line eye.z),
+        f: vec(0 - num.sin(line yaw), 0, num.cos(line yaw)),
+        r: vec(0 - num.cos(line yaw), 0, 0 - num.sin(line yaw)),
+        hover: ""
+    };
+    line st["widgets"] = menuBuild(line st);
+    global menuOf[line uuid] = line st;
+    start menuLoop;
+}
+
+/** Closes the player's menu: removes the board and the seat. */
+function menuClose {
+    line uuid = default.uuid;
+    if (menuIsOpen(line uuid) == 0) {
+        return;
+    }
+    line st = global menuOf[line uuid] as dict;
+    global menuOf.remove(line uuid);
+    for (line wv of line st["widgets"] as list) {
+        line w = line wv as dict;
+        for (line key of ["ent", "bg", "lbl"]) {
+            if (line w.hasKeys(line key as str)) {
+                select entitiesByName(line w[line key as str] as str);
+                selectedEntity.remove();
+                select reset;
+            }
+        }
+    }
+    default.rideEntity();
+    select entitiesByName(line st["seat"] as str);
+    selectedEntity.remove();
+    select reset;
+}
+
+/** Id of the button under the crosshair, or "". */
+function menuHit(st: dict): str {
+    line view = default.location;
+    line yaw: num = line view.getCoordinate(coord="Yaw");
+    line pitch: num = line view.getCoordinate(coord="Pitch");
+    line d = vec(0 - num.sin(line yaw) * num.cos(line pitch), 0 - num.sin(line pitch), num.cos(line yaw) * num.cos(line pitch));
+    line along = line d.dot(st["f"] as vec);
+    if (line along < 0.2) {
+        return "";
+    }
+    line hit = line d * (menuDist() / line along);
+    line x = line hit.dot(st["r"] as vec);
+    line y = line hit.y;
+    for (line wv of st["widgets"] as list) {
+        line w = line wv as dict;
+        if (line w["kind"] as str == "button") {
+            if (num.abs(line x - (line w["x"] as num)) <= (line w["w"] as num) / 2 && num.abs(line y - (line w["y"] as num)) <= (line w["h"] as num) / 2) {
+                return line w["id"] as str;
+            }
+        }
+    }
+    return "";
+}
+
+/** Relights buttons when the one under the crosshair changes. */
+function menuHoverTick {
+    line uuid = default.uuid;
+    line st = global menuOf[line uuid] as dict;
+    line now = menuHit(line st);
+    line was = line st["hover"] as str;
+    if (line now == line was) {
+        return;
+    }
+    for (line wv of line st["widgets"] as list) {
+        line w = line wv as dict;
+        if (line w["kind"] as str == "button") {
+            line id = line w["id"] as str;
+            if (line id == line now) {
+                menuPaint(line w, 1);
+            } else if (line id == line was) {
+                menuPaint(line w, 0);
+            }
+        }
+    }
+    line st["hover"] = line now;
+    global menuOf[line uuid] = line st;
+}
+
+process menuLoop {
+    repeat {
+        if (menuIsOpen(default.uuid) == 0) {
+            break;
+        }
+        menuHoverTick();
+        wait;
+    }
+}
+
+/** Left click in the menu: runs the button under the crosshair. */
+function menuClick {
+    line uuid = default.uuid;
+    line st = global menuOf[line uuid] as dict;
+    line hit = menuHit(line st);
+    for (line wv of line st["widgets"] as list) {
+        line w = line wv as dict;
+        if (line w["kind"] as str == "button" && line w["id"] as str == line hit) {
+            menuAction(line w["action"] as str);
+            return;
+        }
+    }
+}
+
+/** Runs a menu action for the player. */
+function menuAction(action: str) {
+    line uuid = default.uuid;
+    if (action == "gear auto" || action == "gear manual") {
+        if (action == "gear manual") {
+            saved gearMode[line uuid] = 1;
+        } else {
+            saved gearMode[line uuid] = 0;
+        }
+        default.playSound(snd("UI Button Click"));
+        line st = global menuOf[line uuid] as dict;
+        for (line wv of line st["widgets"] as list) {
+            line w = line wv as dict;
+            if (line w["kind"] as str == "button") {
+                if (line w["id"] as str == line st["hover"] as str) {
+                    menuPaint(line w, 1);
+                } else {
+                    menuPaint(line w, 0);
+                }
+            }
+        }
+        // The note under the gearbox buttons.
+        for (line wv of line st["widgets"] as list) {
+            line w = line wv as dict;
+            if (line w["kind"] as str == "text") {
+                select entitiesByName(line w["ent"] as str);
+                selectedEntity.setTextDisplayText(menuStyle(menuGearNote(), "body"));
+                select reset;
+            }
+        }
+    } else if (action == "start") {
+        menuClose();
+        startCommand();
+    } else if (action == "car") {
+        menuClose();
+        spawnCarHere(0);
+    } else if (action == "close") {
+        menuClose();
+    }
+}
+
+/** The roadbook in hotbar slot 1: right click it to open the menu. Holding
+ * an item also makes right clicks reach the plot (the manual gearbox). */
+function giveRoadbook {
+    line book = item("paper").setName(s"<#FFC20E><b>Roadbook</b></#FFC20E> <gray>(right click)");
+    default.setItemInSlot(line book, 1);
+    default.setHotbarSlot(1);
+}
+
+playerevent leftClick {
+    if (menuIsOpen(default.uuid) == 1) {
+        menuClick();
+    } else if (carOf(default.uuid) != 0) {
+        shiftGear(1);
+    }
+}
+
+playerevent rightClick {
+    if (menuIsOpen(default.uuid) == 1) {
+        menuClose();
+    } else if (carOf(default.uuid) != 0) {
+        shiftGear(-1);
+    } else {
+        menuOpen();
+    }
+}
+
+playerevent changeSlot {
+    // Keep the roadbook in hand while driving and in the menu, so right
+    // clicks keep reaching the plot.
+    if (menuIsOpen(default.uuid) == 1 || carOf(default.uuid) != 0) {
+        default.setHotbarSlot(1);
+    }
+}

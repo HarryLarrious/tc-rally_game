@@ -45,6 +45,7 @@ function enterNearestCar {
     global cAwake[line best] = 60;
     carRender(line best);
     default.rideEntity(global cSeat[line best]);
+    default.setHotbarSlot(1);
     default.sendMessage(s"<gray><yellow>W/S</yellow> throttle/brake, <yellow>A/D</yellow> steer, hold <yellow>Shift</yellow> handbrake, <yellow>F</yellow> get out, <yellow>Q</yellow> back on wheels.");
 }
 
@@ -62,6 +63,11 @@ function exitCar {
 }
 
 playerevent dismount {
+    // Shift in the menu closes it.
+    if (menuIsOpen(default.uuid) == 1) {
+        menuClose();
+        return;
+    }
     line c = carOf(default.uuid);
     if (line c != 0) {
         // Shift held: handbrake. Getting out is F.
@@ -86,6 +92,7 @@ playerevent dropItem {
 }
 
 playerevent leave {
+    menuClose();
     line c = carOf(default.uuid);
     if (line c != 0) {
         global cDriver[line c] = "";
@@ -144,6 +151,9 @@ function carHud(c: num) {
     line g = "%var(gear)";
     if (line gear == -1) {
         line g = "R";
+    }
+    if (gearManual(global cDriver[c]) == 1) {
+        line g = "M%var(g)";
     }
     line rpm = num.round(global cRpm[c]);
     line cpu = num.floor(global cpuAvg * 10) / 10;
