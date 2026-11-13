@@ -102,6 +102,8 @@ function tuneCommand(words: list) {
             global tSteer = line v;
         } else if (line name == "lat") {
             global tLatGain = line v;
+        } else if (line name == "smooth") {
+            global tSmooth = num.clamp(num.floor(line v), 1, 8);
         } else if (line name == "links") {
             global linkEvery = num.max(1, num.floor(line v));
         } else {
@@ -109,5 +111,5 @@ function tuneCommand(words: list) {
             return;
         }
     }
-    default.sendMessage(s"<gray>spring <white>%var(tSpring)</white> damper <white>%var(tDamper)</white> grip <white>%var(tGrip)</white> power <white>%var(tPower)</white> brake <white>%var(tBrake)</white> steer <white>%var(tSteer)</white> lat <white>%var(tLatGain)</white> links <white>%var(linkEvery)</white>");
+    default.sendMessage(s"<gray>spring <white>%var(tSpring)</white> damper <white>%var(tDamper)</white> grip <white>%var(tGrip)</white> power <white>%var(tPower)</white> brake <white>%var(tBrake)</white> steer <white>%var(tSteer)</white> lat <white>%var(tLatGain)</white> smooth <white>%var(tSmooth)</white> links <white>%var(linkEvery)</white>");
 }

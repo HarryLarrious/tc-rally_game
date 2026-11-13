@@ -1,0 +1,70 @@
+// Smoothed ground for wheels and body.
+//
+// Each block column has a surface height: the top of the highest solid
+// block with open space above it, found by one raycast down from a little
+// above the car and cached. The ground a wheel feels is a weighted average
+// of the columns around it: tent weights out to tSmooth blocks (@tune
+// smooth, default 5, so 10 x 10 columns). A one-block step becomes a ramp
+// about 2 * tSmooth blocks long instead of a hard edge.
+// A column that rises more than 1.25 above the wheel, or drops more than
+// 1.6, is left out of the average: it is a wall (or a cliff) and the body
+// probes treat it as one.
+
+/** Surface height per "x z base" column, or -999 for none. */
+declare global gColCache: dict[num];
+
+/** Surface height of block column (x, z) seen from about base: the top of
+ * the first solid block below base + 2.5 (down to base - 2), or -999. A
+ * solid block at base + 2.5 gives base + 2.5, which reads as a wall. */
+function colTop(x: num, z: num, base: num): num {
+    line key = "%var(x) %var(z) %var(base)";
+    if (global gColCache.hasKeys(line key)) {
+        return global gColCache[line key];
+    }
+    if (global gColCache.len() > 4000) {
+        global gColCache = {};
+    }
+    line top = base + 2.5;
+    line hit = game.raycast(loc(x + 0.5, line top, z + 0.5, 90, 0), 4.5, blockCollision="Solid blocks");
+    line h = -999;
+    if (line top - line hit.y < 4.49) {
+        line h = line hit.y;
+    }
+    global gColCache[line key] = line h;
+    return line h;
+}
+
+/** Smoothed ground height at world (x, z) for something whose bottom is at
+ * about y, or -999 when no column near it counts as ground. */
+function groundAt(x: num, z: num, y: num): num {
+    line base = num.floor(y);
+    line cx = num.floor(x);
+    line cz = num.floor(z);
+    line r = global tSmooth;
+    if (line r < 1) {
+        line r = 5;
+    }
+    line sw = 0;
+    line sh = 0;
+    for (line dx of range(0 - line r, line r)) {
+        line wx = 1 - num.abs(line cx + line dx as num + 0.5 - x) / line r;
+        if (line wx > 0) {
+            for (line dz of range(0 - line r, line r)) {
+                line wz = 1 - num.abs(line cz + line dz as num + 0.5 - z) / line r;
+                if (line wz > 0) {
+                    line t = colTop(line cx + line dx as num, line cz + line dz as num, line base);
+                    line rise = line t - y;
+                    if (line rise <= 1.25 && line rise >= -1.6) {
+                        line wt = line wx * line wz;
+                        line sw += line wt;
+                        line sh += line wt * line t;
+                    }
+                }
+            }
+        }
+    }
+    if (line sw < 0.01) {
+        return -999;
+    }
+    return line sh / line sw;
+}

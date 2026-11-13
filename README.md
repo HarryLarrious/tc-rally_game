@@ -50,7 +50,7 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
 | `@drive` | Get in the nearest free car within 8 blocks |
 | `@exit` | Get out (same as F) |
-| `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, links |
+| `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, smooth, links |
 | `@dbg` | Toggle the physics debug readout in the action bar |
 | `@damage` | List the damaged parts of your car (or the nearest) |
 | `@hit PART AMOUNT` | Damage one part, e.g. `@hit bumper_f 50` (ids in [car/PARTS.md](car/PARTS.md)) |
@@ -110,13 +110,15 @@ handbrake, F to get out, Q to put the car back on its wheels. The action bar
 shows speed, gear, rpm and plot CPU.
 
 The physics (`tc/physics.tc`) is one rigid body per car, stepped once per
-tick: ray-cast spring-damper suspension per wheel, tires capped by a friction
+tick: spring-damper suspension per wheel, tires capped by a friction
 circle that depends on the surface block, a torque curve with a six-speed
 automatic and 40/60 four-wheel drive, and probe points that push the body out
-of blocks. Each wheel samples the ground under the hub and 0.45 m ahead and
-behind, so a step ahead reads as a ramp and the car climbs half-block slabs;
-body probes ride up onto anything with free space 0.6 m above it and only
-stop at full-height walls. All rigid parts share one display matrix (`tc/render.tc`), so a
+of blocks. The ground is smoothed (`tc/ground.tc`): each block column's
+surface height is averaged over the 10 x 10 columns around it (`@tune smooth
+N` sets the half-width), so a one-block step or a slab is a ramp about 10
+blocks long. Wheels and body probes both ride on that
+surface. A block with a solid block above it, or a column more than about one
+block above the car, is a wall. All rigid parts share one display matrix (`tc/render.tc`), so a
 driven car costs about 5% plot CPU.
 
 DiamondFire numbers keep 3 decimals, so the physics works per unit mass

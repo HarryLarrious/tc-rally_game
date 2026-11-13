@@ -1,8 +1,8 @@
 // Car physics: one rigid body per car, stepped once per tick (dt = 0.05 s).
 //
-// - Suspension: each wheel casts a ray down the car's -up axis from its
-//   full-bump point. The hit gives the compression; a spring and damper push
-//   the body up at the contact point.
+// - Suspension: each wheel reads the smoothed ground height (ground.tc)
+//   under it, where block steps are ramps. That gives the compression; a
+//   spring and damper push the body up at the contact point.
 // - Tires: at each contact the tire takes up the sideways slip velocity (an
 //   impulse that cancels part of it per tick) and adds drive, brake and
 //   rolling forces along the wheel. The sum is capped by a friction circle,
@@ -25,6 +25,8 @@ declare global tPower: num;
 declare global tBrake: num;
 declare global tSteer: num;
 declare global tLatGain: num;
+/** Ground smoothing half-width in blocks (ground.tc). */
+declare global tSmooth: num;
 /** Collision probe points (car frame, relative to the center of mass). */
 declare global gProbes: list[vec];
 /** Grip per surface block id; blocks not listed have surfDefault. */
@@ -47,6 +49,7 @@ function resetTuning {
     global tSteer = 32;
     // Share of the sideways slip velocity a tire takes up per tick.
     global tLatGain = 0.8;
+    global tSmooth = 5;
 }
 
 /** Collision probes: the body's eight corners plus the nose and tail. */
@@ -302,21 +305,20 @@ function carCollide(c: num) {
         line n = vec(0, 1, 0);
         line depth = 0;
         if (line blk.isSolid()) {
-            // The cell counts as solid for a slab too, so find the real top
-            // of what is in it: cast down from the cell's top face onto the
-            // block's actual shape. A solid cell above it is a wall.
+            // A block with a solid block above it is a wall. One with open
+            // space above is ground: the body rides on the smoothed ground
+            // (ground.tc), so it can clip the edge of a step and slides up
+            // the ramp instead of hitting the edge.
             line cy = num.floor(line p.y);
             line above = game.getBlockMaterial(loc(line p.x, line cy + 1.5, line p.z), returnValue="Item");
             if (line above.isSolid()) {
                 line touching = 2;
             } else {
-                line hit = game.raycast(loc(line p.x, line cy + 1.001, line p.z, 90, 0), 1.0, blockCollision="Solid blocks");
-                line depth = line hit.y - line p.y;
-                if (line depth > 0.6) {
-                    // Too tall to ride up onto: a wall.
+                line gh = groundAt(line p.x, line p.z, line p.y);
+                line depth = line gh - line p.y;
+                if (line gh < -900 || line depth > 0.9) {
                     line touching = 2;
                 } else if (line depth > 0.005) {
-                    // A step (slab, stair, low block): ride up onto it.
                     line touching = 1;
                 }
             }
@@ -412,28 +414,17 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
     if (line front) {
         line z = global gAxleF;
     }
-    // Ground under the wheel, sampled under the hub and 0.45 m ahead and
-    // behind from 1.05 m up (car frame). A sample off the hub counts lower by
-    // 0.55 per meter, so a step ahead reads as a ramp and the suspension lifts
-    // the wheel onto it before the hub reaches the edge.
-    line down = line U * -1;
+    // Ground under the wheel: the smoothed ground height (ground.tc) at the
+    // wheel's bottom at mid travel (car frame y 0), as a car-frame height
+    // measured along U.
+    line ml = vec(line side * global gTrackX - line com.x, 0 - line com.y, line z - line com.z);
+    line wp = line pos + line L * line ml.x + line U * line ml.y + line F * line ml.z;
     line ground = -9;
-    for (line dzv of [0, 0.45, -0.45]) {
-        line dz = line dzv as num;
-        line ml = vec(line side * global gTrackX - line com.x, 1.05 - line com.y, line z + line dz - line com.z);
-        line top = line pos + line L * line ml.x + line U * line ml.y + line F * line ml.z;
-        line hit = game.raycast(loc(line top.x, line top.y, line top.z).setDirection(line down), 1.17, blockCollision="Solid blocks");
-        line d = (vec(line hit.x, line hit.y, line hit.z) - line top).len();
-        if (line d < 1.165) {
-            line ground = num.max(line ground, 1.05 - line d - 0.55 * num.abs(line dz));
+    if (U.y > 0.3) {
+        line gh = groundAt(line wp.x, line wp.z, line wp.y);
+        if (line gh > -900) {
+            line ground = (line gh - line wp.y) / U.y;
         }
-    }
-    // A real wheel climbs a step along its edge, so the ground it feels may
-    // rise only as fast as rolling up a 0.9 slope (plus a little): a step
-    // is taken over a few ticks instead of in one jolt.
-    if (global wComp[line k] > 0) {
-        line rise = 0.02 + num.abs(vel.dot(F)) * line dt * 0.9;
-        line ground = num.min(line ground, global wComp[line k] - 0.12 + line rise);
     }
     // Compression from full droop (wheel bottom at -0.12); 0.24 is full bump.
     if (line ground > -0.12) {
@@ -466,7 +457,12 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
         line vlong = line vc.dot(line fw);
         line vlat = line vc.dot(line lat);
         if (global rTick % 5 == 0) {
-            line under = game.getBlockMaterial(loc(line hv.x, line hv.y - 0.05, line hv.z));
+            // The block on top of the column under the wheel.
+            line ct = colTop(num.floor(line wp.x), num.floor(line wp.z), num.floor(line wp.y));
+            if (line ct < -900 || line ct - line wp.y > 1.25) {
+                line ct = line hv.y;
+            }
+            line under = game.getBlockMaterial(loc(line wp.x, line ct - 0.05, line wp.z));
             if (global surfMu.hasKeys(line under)) {
                 global wMu[line k] = global surfMu[line under];
             } else {

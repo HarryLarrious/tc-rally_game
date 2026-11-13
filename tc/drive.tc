@@ -96,6 +96,10 @@ playerevent leave {
 /** Advances every car one tick: input, physics, drawing, the driver HUD. */
 function carsTick {
     global rTick += 1;
+    // Forget the ground heights now and then, so built or broken blocks count.
+    if (global rTick % 400 == 0) {
+        global gColCache = {};
+    }
     global cpuAvg = global cpuAvg * 0.9 + game.cpuUsage * 0.1;
     repeat (line c to global carCount) {
         if (global cStatic[line c] == 1) {
@@ -186,9 +190,13 @@ process carLoop {
     loadCarGeom();
     loadProbes();
     loadSurfaces();
+    global gColCache = {};
     loadPartStats();
     if (global tSpring == 0) {
         resetTuning();
+    }
+    if (global tSmooth == 0) {
+        global tSmooth = 5;
     }
     dropStaleCars();
     stageLoad();
