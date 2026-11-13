@@ -1,0 +1,563 @@
+// Structures and props of the rally map: start and finish gantries, the
+// service park, village houses and church, the bridge, the lake jetty,
+// cabins and spectator stands; hay bales, marker posts, chevron boards and
+// kilometre signs along the road; text displays over the gantries.
+//
+// Structures are drawn in a local frame: u along the long axis, v across it,
+// y up, from an origin (ox, oz). ax is 1 when u runs along x, else along z.
+
+/** Fills a box of the local frame. */
+function sbox(it: str, ox: num, oz: num, ax: num, u0: num, v0: num, u1: num, v1: num, y0: num, y1: num, data: str = "") {
+    line a = loc(ox + v0, y0, oz + u0);
+    line b = loc(ox + v1, y1, oz + u1);
+    if (ax == 1) {
+        line a = loc(ox + u0, y0, oz + v0);
+        line b = loc(ox + u1, y1, oz + v1);
+    }
+    if (data == "") {
+        game.setRegion(item(it), line a, line b);
+    } else {
+        game.setRegion(item(it), line a, line b, data);
+    }
+}
+
+/** Compass name of the local direction: du, dv in -1..1 (one of them 0). */
+function sdir(ax: num, du: num, dv: num): str {
+    line dx = dv;
+    line dz = du;
+    if (ax == 1) {
+        line dx = du;
+        line dz = dv;
+    }
+    if (line dx > 0) {
+        return "east";
+    } else if (line dx < 0) {
+        return "west";
+    } else if (line dz > 0) {
+        return "south";
+    }
+    return "north";
+}
+
+/** Sets one block of the local frame. */
+function sset(it: str, ox: num, oz: num, ax: num, u: num, v: num, y: num, data: str = "") {
+    sbox(it, ox, oz, ax, u, v, u, v, y, y, data);
+}
+
+// ---------------------------------------------------------------- houses
+
+/** A village house (style 0..2) or a cabin (3). The door faces `face`
+ * (0 +x, 1 +z, 2 -x, 3 -z). Floor at y. */
+function buildHouse(x: num, y: num, z: num, face: num, style: num) {
+    line ax = 0;
+    if (face == 1 || face == 3) {
+        line ax = 1;
+    }
+    line dv = 1;
+    if (face == 2 || face == 3) {
+        line dv = -1;
+    }
+    line wall = ["white_terracotta", "stone_bricks", "oak_planks", "spruce_planks"][style + 1] as str;
+    line post = ["stripped_oak_log", "spruce_log", "oak_log", "stripped_spruce_log"][style + 1] as str;
+    line roof = ["dark_oak", "spruce", "brick", "spruce"][style + 1] as str;
+    line roofBlock = ["dark_oak_planks", "spruce_planks", "bricks", "spruce_planks"][style + 1] as str;
+    line hu = 4;
+    line hv = 3;
+    if (style == 3) {
+        line hu = 3;
+        line hv = 2;
+    }
+    // Ground, yard and foundation.
+    sbox("air", x, z, line ax, 0 - line hu - 3, 0 - line hv - 3, line hu + 3, line hv + 3, y + 1, y + 12);
+    sbox("dirt", x, z, line ax, 0 - line hu - 3, 0 - line hv - 2, line hu + 3, line hv + 2, y - 3, y - 1);
+    sbox("grass_block", x, z, line ax, 0 - line hu - 3, 0 - line hv - 2, line hu + 3, line hv + 2, y, y);
+    sbox("cobblestone", x, z, line ax, 0 - line hu, 0 - line hv, line hu, line hv, y - 3, y - 1);
+    sbox("oak_planks", x, z, line ax, 0 - line hu, 0 - line hv, line hu, line hv, y, y);
+    // Walls with corner posts and windows.
+    sbox(line wall, x, z, line ax, 0 - line hu, 0 - line hv, line hu, line hv, y + 1, y + 4);
+    sbox("air", x, z, line ax, 1 - line hu, 1 - line hv, line hu - 1, line hv - 1, y + 1, y + 4);
+    for (line cu of [0 - line hu, line hu]) {
+        for (line cv of [0 - line hv, line hv]) {
+            sbox(line post, x, z, line ax, line cu as num, line cv as num, line cu as num, line cv as num, y + 1, y + 4);
+        }
+    }
+    for (line wu of [-2, 2]) {
+        sbox("glass_pane", x, z, line ax, line wu as num, 0 - line hv, line wu as num, 0 - line hv, y + 2, y + 3);
+        sbox("glass_pane", x, z, line ax, line wu as num, line hv, line wu as num, line hv, y + 2, y + 3);
+    }
+    sbox("glass_pane", x, z, line ax, 0 - line hu, 0, 0 - line hu, 0, y + 2, y + 3);
+    sbox("glass_pane", x, z, line ax, line hu, 0, line hu, 0, y + 2, y + 3);
+    // Door on the road side, with a path to the garden gate.
+    line out = sdir(line ax, 0, line dv);
+    sset("oak_door", x, z, line ax, 0, line dv * line hv, y + 1, "half=lower,facing=%var(out)");
+    sset("oak_door", x, z, line ax, 0, line dv * line hv, y + 2, "half=upper,facing=%var(out)");
+    sset("lantern", x, z, line ax, 1, line dv * (line hv + 1), y + 3);
+    sset("oak_fence", x, z, line ax, 1, line dv * (line hv + 1), y + 2);
+    sset("oak_fence", x, z, line ax, 1, line dv * (line hv + 1), y + 1);
+    sbox("dirt_path", x, z, line ax, 0, line dv * (line hv + 1), 0, line dv * (line hv + 2), y, y);
+    // Roof: stairs from both long sides up to the ridge, gables at the ends.
+    line up1 = sdir(line ax, 0, 1);
+    line up2 = sdir(line ax, 0, -1);
+    repeat (line k to line hv + 1) {
+        line kk = line k - 1;
+        sbox("%var(roof)_stairs", x, z, line ax, -1 - line hu, line kk - line hv - 1, line hu + 1, line kk - line hv - 1, y + 4 + line kk, y + 4 + line kk, "facing=%var(up1)");
+        sbox("%var(roof)_stairs", x, z, line ax, -1 - line hu, line hv + 1 - line kk, line hu + 1, line hv + 1 - line kk, y + 4 + line kk, y + 4 + line kk, "facing=%var(up2)");
+        if (line kk >= 1) {
+            sbox(line wall, x, z, line ax, 0 - line hu, line kk - line hv, 0 - line hu, line hv - line kk, y + 4 + line kk, y + 4 + line kk);
+            sbox(line wall, x, z, line ax, line hu, line kk - line hv, line hu, line hv - line kk, y + 4 + line kk, y + 4 + line kk);
+        }
+    }
+    sbox(line roofBlock, x, z, line ax, -1 - line hu, 0, line hu + 1, 0, y + 5 + line hv, y + 5 + line hv);
+    if (style != 3) {
+        sbox("bricks", x, z, line ax, 2, -1, 2, -1, y + 5, y + 6 + line hv);
+        sset("campfire", x, z, line ax, 2, -1, y + 7 + line hv, "lit=false");
+        // Garden fence with a gate gap at the path, and some flowers.
+        line fu = line hu + 3;
+        line fv = line hv + 2;
+        sbox("oak_fence", x, z, line ax, 0 - line fu, 0 - line fv, line fu, 0 - line fv, y + 1, y + 1);
+        sbox("oak_fence", x, z, line ax, 0 - line fu, line fv, line fu, line fv, y + 1, y + 1);
+        sbox("oak_fence", x, z, line ax, 0 - line fu, 0 - line fv, 0 - line fu, line fv, y + 1, y + 1);
+        sbox("oak_fence", x, z, line ax, line fu, 0 - line fv, line fu, line fv, y + 1, y + 1);
+        sbox("air", x, z, line ax, -1, line dv * line fv, 1, line dv * line fv, y + 1, y + 1);
+        repeat (5) {
+            line fl = ["poppy", "dandelion", "cornflower", "oxeye_daisy", "allium", "rose_bush"][num.floor(num.randomd(1, 7))] as str;
+            line pu = num.floor(num.randomd(line hu + 1, line fu));
+            if (num.randomd(0, 1) < 0.5) {
+                line pu = 0 - line pu;
+            }
+            line pv = num.floor(num.randomd(0 - line hv, line hv));
+            if (line fl == "rose_bush") {
+                sset(line fl, x, z, line ax, line pu, line pv, y + 1, "half=lower");
+                sset(line fl, x, z, line ax, line pu, line pv, y + 2, "half=upper");
+            } else {
+                sset(line fl, x, z, line ax, line pu, line pv, y + 1);
+            }
+        }
+    }
+    // Furniture.
+    sset("crafting_table", x, z, line ax, 1 - line hu, 1 - line hv, y + 1);
+    sset("barrel", x, z, line ax, line hu - 1, 1 - line hv, y + 1, "facing=up");
+    sset("red_bed", x, z, line ax, line hu - 1, line hv - 2, y + 1, "part=foot,facing=%var(up2)");
+    sset("red_bed", x, z, line ax, line hu - 1, line hv - 1, y + 1, "part=head,facing=%var(up2)");
+}
+
+/** The village church: a long nave and a bell tower at the end facing
+ * `face` (0 +x, 1 +z, 2 -x, 3 -z), door in the tower. */
+function buildChurch(x: num, y: num, z: num, face: num) {
+    line ax = 0;
+    if (face == 0 || face == 2) {
+        line ax = 1;
+    }
+    line m = 1;
+    if (face == 2 || face == 3) {
+        line m = -1;
+    }
+    sbox("air", x, z, line ax, -12, -8, 12, 8, y + 1, y + 24);
+    sbox("grass_block", x, z, line ax, -12, -8, 12, 8, y, y);
+    sbox("dirt", x, z, line ax, -12, -8, 12, 8, y - 3, y - 1);
+    sbox("stone_bricks", x, z, line ax, -9, -4, 9, 4, y - 3, y);
+    sbox("stone_bricks", x, z, line ax, -9 * line m, -4, 5 * line m, 4, y + 1, y + 7);
+    sbox("air", x, z, line ax, -8 * line m, -3, 4 * line m, 3, y + 1, y + 7);
+    sbox("polished_andesite", x, z, line ax, -8 * line m, -3, 4 * line m, 3, y, y);
+    repeat (line k to 4) {
+        line wu = (-9 + line k * 3) * line m;
+        sbox("blue_stained_glass_pane", x, z, line ax, line wu, -4, line wu, -4, y + 3, y + 6);
+        sbox("blue_stained_glass_pane", x, z, line ax, line wu, 4, line wu, 4, y + 3, y + 6);
+    }
+    line s1 = sdir(line ax, 0, 1);
+    line s2 = sdir(line ax, 0, -1);
+    repeat (line k to 6) {
+        line kk = line k - 1;
+        sbox("deepslate_tile_stairs", x, z, line ax, -10 * line m, line kk - 5, 6 * line m, line kk - 5, y + 7 + line kk, y + 7 + line kk, "facing=%var(s1)");
+        sbox("deepslate_tile_stairs", x, z, line ax, -10 * line m, 5 - line kk, 6 * line m, 5 - line kk, y + 7 + line kk, y + 7 + line kk, "facing=%var(s2)");
+        if (line kk >= 1) {
+            sbox("stone_bricks", x, z, line ax, -9 * line m, line kk - 4, -9 * line m, 4 - line kk, y + 7 + line kk, y + 7 + line kk);
+        }
+    }
+    sbox("deepslate_tiles", x, z, line ax, -10 * line m, 0, 6 * line m, 0, y + 12, y + 12);
+    // Pews facing the altar (away from the tower).
+    line back = sdir(line ax, line m, 0);
+    repeat (line k to 4) {
+        line pu = (-6 + line k * 2) * line m;
+        sbox("spruce_stairs", x, z, line ax, line pu, -2, line pu, -1, y + 1, y + 1, "facing=%var(back)");
+        sbox("spruce_stairs", x, z, line ax, line pu, 1, line pu, 2, y + 1, y + 1, "facing=%var(back)");
+    }
+    // Bell tower.
+    sbox("stone_bricks", x, z, line ax, 5 * line m, -2, 9 * line m, 2, y + 1, y + 18);
+    sbox("air", x, z, line ax, 6 * line m, -1, 8 * line m, 1, y + 1, y + 17);
+    sbox("air", x, z, line ax, 5 * line m, -1, 9 * line m, 1, y + 14, y + 16);
+    sbox("air", x, z, line ax, 6 * line m, -2, 8 * line m, 2, y + 14, y + 16);
+    sset("bell", x, z, line ax, 7 * line m, 0, y + 16, "attachment=ceiling");
+    sbox("deepslate_tiles", x, z, line ax, 5 * line m, -2, 9 * line m, 2, y + 19, y + 19);
+    sbox("deepslate_tiles", x, z, line ax, 6 * line m, -1, 8 * line m, 1, y + 20, y + 20);
+    sset("deepslate_tiles", x, z, line ax, 7 * line m, 0, y + 21);
+    sset("lightning_rod", x, z, line ax, 7 * line m, 0, y + 22);
+    sbox("air", x, z, line ax, 6 * line m, 0, 9 * line m, 0, y + 1, y + 2);
+    line out = sdir(line ax, line m, 0);
+    sset("dark_oak_door", x, z, line ax, 9 * line m, 0, y + 1, "half=lower,facing=%var(out)");
+    sset("dark_oak_door", x, z, line ax, 9 * line m, 0, y + 2, "half=upper,facing=%var(out)");
+}
+
+// ---------------------------------------------------------------- park
+
+/** Service park: asphalt lot with team tents, a timing tower and lamps. */
+function buildPark(x0: num, z0: num, x1: num, z1: num) {
+    line y = 50;
+    // The lot, in strips so the server keeps up.
+    line sx = x0 - 2;
+    while (line sx <= x1 + 2) {
+        line ex = num.min(line sx + 15, x1 + 2);
+        game.setRegion(item("air"), loc(line sx, y + 1, z0 - 2), loc(line ex, y + 14, z1 + 2));
+        game.setRegion(item("stone"), loc(num.max(line sx, x0), y - 3, z0), loc(num.min(line ex, x1), y - 1, z1));
+        game.setRegion(item("gray_concrete"), loc(num.max(line sx, x0), y, z0), loc(num.min(line ex, x1), y, z1));
+        mapCost(16 * (z1 - z0) * 18 / 300);
+        mapPace();
+        line sx = line ex + 1;
+    }
+    game.setRegion(item("polished_andesite"), loc(x0 - 1, y, z0 - 1), loc(x1 + 1, y, z0 - 1));
+    game.setRegion(item("polished_andesite"), loc(x0 - 1, y, z1 + 1), loc(x1 + 1, y, z1 + 1));
+    game.setRegion(item("polished_andesite"), loc(x0 - 1, y, z0 - 1), loc(x0 - 1, y, z1 + 1));
+    game.setRegion(item("polished_andesite"), loc(x1 + 1, y, z0 - 1), loc(x1 + 1, y, z1 + 1));
+    // Two driveways up to the road.
+    for (line dx of [x0 + 24, x1 - 40]) {
+        game.setRegion(item("gray_concrete"), loc(line dx as num, y, z0 - 14), loc((line dx as num) + 8, y, z0 - 1));
+        game.setRegion(item("air"), loc(line dx as num, y + 1, z0 - 14), loc((line dx as num) + 8, y + 8, z0 - 1));
+    }
+    // Parking bays along the north side.
+    line bx = x0 + 4;
+    while (line bx < x1 - 4) {
+        game.setRegion(item("white_concrete"), loc(line bx, y, z0 + 2), loc(line bx, y, z0 + 9));
+        line bx += 6;
+    }
+    // Team tents along the south side.
+    line colors = ["red", "blue", "yellow", "lime", "orange", "purple", "cyan"];
+    line k = 0;
+    line tx = x0 + 6;
+    while (line tx + 10 < x1 - 20) {
+        line k += 1;
+        line col = line colors[(line k - 1) % 7 + 1] as str;
+        buildTent(line tx, y, z1 - 14, line col);
+        line tx += 26;
+    }
+    // Timing tower at the east end.
+    line tx = x1 - 14;
+    line tz = z0 + 14;
+    game.setRegion(item("white_concrete"), loc(line tx, y + 1, line tz), loc(line tx + 8, y + 9, line tz + 8));
+    game.setRegion(item("air"), loc(line tx + 1, y + 1, line tz + 1), loc(line tx + 7, y + 8, line tz + 7));
+    game.setRegion(item("light_blue_stained_glass"), loc(line tx, y + 6, line tz), loc(line tx + 8, y + 8, line tz + 8));
+    game.setRegion(item("air"), loc(line tx + 1, y + 6, line tz + 1), loc(line tx + 7, y + 8, line tz + 7));
+    game.setRegion(item("smooth_stone_slab"), loc(line tx + 1, y + 5, line tz + 1), loc(line tx + 7, y + 5, line tz + 7));
+    game.setRegion(item("black_concrete"), loc(line tx - 1, y + 10, line tz - 1), loc(line tx + 9, y + 10, line tz + 9));
+    game.setRegion(item("air"), loc(line tx + 4, y + 1, line tz), loc(line tx + 4, y + 2, line tz));
+    game.setRegion(item("ladder"), loc(line tx + 1, y + 1, line tz + 7), loc(line tx + 1, y + 5, line tz + 7), "facing=east");
+    // Lamp posts.
+    line lx = x0 + 10;
+    while (line lx < x1 - 4) {
+        game.setRegion(item("dark_oak_fence"), loc(line lx, y + 1, z0 + 11), loc(line lx, y + 4, z0 + 11));
+        game.setBlock(item("lantern"), loc(line lx, y + 5, z0 + 11));
+        line lx += 30;
+    }
+    // Flags along the road side.
+    line fx = x0;
+    while (line fx < x1) {
+        game.setRegion(item("iron_bars"), loc(line fx, y + 1, z0 - 4), loc(line fx, y + 7, z0 - 4));
+        line fc = line colors[num.floor(num.randomd(1, 8))] as str;
+        game.setRegion(item("%var(fc)_wool"), loc(line fx + 1, y + 6, z0 - 4), loc(line fx + 2, y + 7, z0 - 4));
+        line fx += 20;
+    }
+}
+
+/** A team tent: 9 x 9 canopy on posts, back wall, tools and tyres. */
+function buildTent(x: num, y: num, z: num, col: str) {
+    for (line px of [x, x + 8]) {
+        for (line pz of [z, z + 8]) {
+            game.setRegion(item("birch_fence"), loc(line px as num, y + 1, line pz as num), loc(line px as num, y + 4, line pz as num));
+        }
+    }
+    game.setRegion(item("%var(col)_wool"), loc(x, y + 5, z), loc(x + 8, y + 5, z + 8));
+    game.setRegion(item("white_wool"), loc(x + 3, y + 5, z), loc(x + 5, y + 5, z + 8));
+    game.setRegion(item("%var(col)_wool"), loc(x, y + 1, z + 8), loc(x + 8, y + 4, z + 8));
+    game.setRegion(item("%var(col)_carpet"), loc(x, y + 6, z), loc(x + 8, y + 6, z + 8));
+    game.setBlock(item("anvil"), loc(x + 1, y + 1, z + 7));
+    game.setBlock(item("smithing_table"), loc(x + 2, y + 1, z + 7));
+    game.setBlock(item("grindstone"), loc(x + 3, y + 1, z + 7), "face=floor");
+    game.setRegion(item("barrel"), loc(x + 6, y + 1, z + 7), loc(x + 7, y + 2, z + 7), "facing=up");
+    game.setRegion(item("black_wool"), loc(x + 7, y + 1, z + 5), loc(x + 7, y + 3, z + 5));
+    game.setRegion(item("black_wool"), loc(x + 7, y + 1, z + 3), loc(x + 7, y + 2, z + 3));
+    game.setBlock(item("chest"), loc(x + 1, y + 1, z + 5), "facing=east");
+    game.setBlock(item("iron_chain"), loc(x + 4, y + 4, z + 4));
+    game.setBlock(item("lantern"), loc(x + 4, y + 3, z + 4), "hanging=true");
+}
+
+// ---------------------------------------------------------------- others
+
+/** Start or finish gantry over the road at (x, y, z); ax 1 when the road
+ * runs along x. Checkered pillars and beam, checkered line on the road. */
+function buildGantry(x: num, y: num, z: num, roadAx: num) {
+    // The gantry frame: u along the road, v across.
+    line ax = roadAx;
+    sbox("air", x, z, line ax, -1, -7, 2, 7, y + 1, y + 10);
+    repeat (line k to 9) {
+        line yy = y + line k;
+        line c1 = "black_concrete";
+        line c2 = "white_concrete";
+        if (line k % 2 == 0) {
+            line c1 = "white_concrete";
+            line c2 = "black_concrete";
+        }
+        sbox(line c1, x, z, line ax, 0, -6, 1, -6, line yy, line yy);
+        sbox(line c2, x, z, line ax, 0, 6, 1, 6, line yy, line yy);
+    }
+    repeat (line k to 13) {
+        line v = line k - 7;
+        line c1 = "black_concrete";
+        if (line k % 2 == 0) {
+            line c1 = "white_concrete";
+        }
+        sbox(line c1, x, z, line ax, 0, line v, 1, line v, y + 9, y + 9);
+        // Line on the road.
+        sset(line c1, x, z, line ax, 0, line v, y);
+        if (line k % 2 == 0) {
+            sset("black_concrete", x, z, line ax, 1, line v, y);
+        } else {
+            sset("white_concrete", x, z, line ax, 1, line v, y);
+        }
+    }
+    sbox("polished_andesite", x, z, line ax, -1, -7, 2, -5, y, y);
+    sbox("polished_andesite", x, z, line ax, -1, 5, 2, 7, y, y);
+    sset("lantern", x, z, line ax, 0, -6, y + 10);
+    sset("lantern", x, z, line ax, 0, 6, y + 10);
+}
+
+/** Wooden bridge from (x0, z0) to (x1, z1) at deck y. */
+function buildBridge(x0: num, y: num, z0: num, x1: num, z1: num) {
+    line ax = 0;
+    line len = z1 - z0;
+    line ox = num.round((x0 + x1) / 2);
+    line oz = z0;
+    if (num.abs(x1 - x0) >= num.abs(z1 - z0)) {
+        line ax = 1;
+        line len = x1 - x0;
+        line ox = x0;
+        line oz = num.round((z0 + z1) / 2);
+    }
+    sbox("air", line ox, line oz, line ax, 0, -5, line len, 5, y + 1, y + 10);
+    sbox("stone_bricks", line ox, line oz, line ax, 0, -5, 2, 5, y - 6, y - 1);
+    sbox("stone_bricks", line ox, line oz, line ax, line len - 2, -5, line len, 5, y - 6, y - 1);
+    line u = 6;
+    while (line u < line len - 4) {
+        sbox("stone_bricks", line ox, line oz, line ax, line u, -4, line u + 1, -3, 36, y - 1);
+        sbox("stone_bricks", line ox, line oz, line ax, line u, 3, line u + 1, 4, 36, y - 1);
+        sbox("stone_brick_wall", line ox, line oz, line ax, line u, -2, line u + 1, 2, y - 2, y - 2);
+        line u += 8;
+    }
+    line logAxis = "z";
+    if (line ax == 1) {
+        line logAxis = "x";
+    }
+    sbox("stripped_spruce_log", line ox, line oz, line ax, 0, -4, line len, -4, y - 1, y - 1, "axis=%var(logAxis)");
+    sbox("stripped_spruce_log", line ox, line oz, line ax, 0, 4, line len, 4, y - 1, y - 1, "axis=%var(logAxis)");
+    sbox("spruce_planks", line ox, line oz, line ax, 0, -4, line len, 4, y, y);
+    sbox("spruce_fence", line ox, line oz, line ax, 0, -5, line len, -5, y + 1, y + 1);
+    sbox("spruce_fence", line ox, line oz, line ax, 0, 5, line len, 5, y + 1, y + 1);
+    line u = 0;
+    while (line u <= line len) {
+        sset("stripped_spruce_log", line ox, line oz, line ax, line u, -5, y + 1);
+        sset("stripped_spruce_log", line ox, line oz, line ax, line u, 5, y + 1);
+        sset("lantern", line ox, line oz, line ax, line u, -5, y + 2);
+        sset("lantern", line ox, line oz, line ax, line u, 5, y + 2);
+        line u += 8;
+    }
+}
+
+/** Jetty from the shore at (x, z) into the lake towards -z. */
+function buildJetty(x: num, y: num, z: num) {
+    line w = y + 1;
+    sbox("air", x, z, 0, -24, -2, 2, 2, line w + 1, line w + 6);
+    sbox("spruce_planks", x, z, 0, -24, -1, 2, 1, line w, line w);
+    line u = -24;
+    while (line u <= 0) {
+        sbox("spruce_log", x, z, 0, line u, -2, line u, -2, line w - 6, line w + 1);
+        sbox("spruce_log", x, z, 0, line u, 2, line u, 2, line w - 6, line w + 1);
+        line u += 4;
+    }
+    sbox("spruce_fence", x, z, 0, -24, -2, 0, -2, line w + 1, line w + 1);
+    sbox("spruce_fence", x, z, 0, -24, 2, 0, 2, line w + 1, line w + 1);
+    sset("lantern", x, z, 0, -24, -2, line w + 2);
+    sset("lantern", x, z, 0, -24, 2, line w + 2);
+    sset("barrel", x, z, 0, -22, 1, line w + 1, "facing=up");
+    sset("spruce_trapdoor", x, z, 0, -23, 0, line w + 1, "half=bottom,open=false");
+}
+
+/** Spectator stand at (x, y, z), its front towards `face`. */
+function buildStand(x: num, y: num, z: num, face: num) {
+    line ax = 1;
+    if (face == 0 || face == 2) {
+        line ax = 0;
+    }
+    line dv = 1;
+    if (face == 2 || face == 3) {
+        line dv = -1;
+    }
+    line back = sdir(line ax, 0, 0 - line dv);
+    sbox("air", x, z, line ax, -7, -5 * line dv, 7, line dv * 2, y + 1, y + 10);
+    sbox("stone_bricks", x, z, line ax, -7, -5 * line dv, 7, line dv * 2, y - 3, y);
+    repeat (line k to 4) {
+        line v = (1 - line k) * line dv;
+        sbox("stone_bricks", x, z, line ax, -6, line v, 6, line v, y + 1, y + line k - 1);
+        sbox("spruce_stairs", x, z, line ax, -6, line v, 6, line v, y + line k, y + line k, "facing=%var(back)");
+    }
+    sbox("oak_fence", x, z, line ax, -7, line dv, 7, line dv, y + 1, y + 1);
+    for (line pu of [-7, 7]) {
+        sbox("oak_fence", x, z, line ax, line pu as num, line dv, line pu as num, line dv, y + 1, y + 7);
+        sbox("oak_fence", x, z, line ax, line pu as num, -4 * line dv, line pu as num, -4 * line dv, y + 4, y + 7);
+    }
+    repeat (line k to 6) {
+        line v = (2 - line k) * line dv;
+        line c = "red_wool";
+        if (line k % 2 == 0) {
+            line c = "white_wool";
+        }
+        sbox(line c, x, z, line ax, -7, line v, 7, line v, y + 8, y + 8);
+    }
+}
+
+// ---------------------------------------------------------------- phases
+
+/** Builds every structure inside the area. */
+function mapStructsBuild {
+    global mapPhase = "structures";
+    line all = mapStructs();
+    global mapDone = 0;
+    global mapTotal = line all.len();
+    for (line row of line all) {
+        if (global mapStop == 1) {
+            return;
+        }
+        line f = (line row as str).split(" ");
+        line kind = line f[1] as str;
+        line x = num.parse(line f[2] as str);
+        line y = num.parse(line f[3] as str);
+        line z = num.parse(line f[4] as str);
+        line a = num.parse(line f[5] as str);
+        line b = num.parse(line f[6] as str);
+        if (mapInArea(line x, line z) == 1) {
+            if (line kind == "house") {
+                buildHouse(line x, line y, line z, line a, line b);
+            } else if (line kind == "cabin") {
+                buildHouse(line x, line y, line z, 1, 3);
+            } else if (line kind == "church") {
+                buildChurch(line x, line y, line z, line a);
+            } else if (line kind == "park") {
+                buildPark(line x, line z, line a, line b);
+            } else if (line kind == "start" || line kind == "finish") {
+                buildGantry(line x, line y, line z, 1 - line a);
+            } else if (line kind == "bridge") {
+                buildBridge(line x, line y, line z, line a, line b);
+            } else if (line kind == "jetty") {
+                buildJetty(line x, line y, line z);
+            } else if (line kind == "stand") {
+                buildStand(line x, line y, line z, line a);
+            }
+        }
+        global mapDone += 1;
+        mapCost(40);
+        mapPace();
+    }
+}
+
+/** Hay bales, marker posts, chevron boards and kilometre signs. */
+function mapPropsBuild {
+    global mapPhase = "props";
+    global mapDone = 0;
+    global mapTotal = mapPropParts();
+    repeat (line part to mapPropParts()) {
+        for (line row of mapPropsPart(line part - 1)) {
+            for (line p of (line row as str).split(";")) {
+                if (global mapStop == 1) {
+                    return;
+                }
+                line f = (line p as str).split(" ");
+                line kind = line f[1] as str;
+                line x = num.parse(line f[2] as str);
+                line y = num.parse(line f[3] as str);
+                line z = num.parse(line f[4] as str);
+                line a = num.parse(line f[5] as str);
+                line b = num.parse(line f[6] as str);
+                if (mapInArea(line x, line z) == 1) {
+                    mapProp(line kind, line x, line y, line z, line a, line b);
+                    mapCost(2);
+                }
+            }
+            mapPace();
+        }
+        global mapDone += 1;
+    }
+}
+
+function mapProp(kind: str, x: num, y: num, z: num, a: num, b: num) {
+    if (kind == "hay") {
+        game.setBlock(item("hay_block"), loc(x, y, z));
+        if (num.randomd(0, 1) < 0.4) {
+            game.setBlock(item("hay_block"), loc(x, y + 1, z));
+        }
+    } else if (kind == "post") {
+        game.setBlock(item("diorite_wall"), loc(x, y, z));
+        game.setBlock(item("red_nether_brick_wall"), loc(x, y + 1, z));
+    } else if (kind == "chev") {
+        // a: 1 when the board runs along x.
+        line d = vec(0, 0, 1);
+        if (a == 1) {
+            line d = vec(1, 0, 0);
+        }
+        line c = loc(x, y, z);
+        game.setRegion(item("air"), line c - line d, (line c + line d) + vec(0, 3, 0));
+        game.setBlock(item("dark_oak_fence"), line c - line d);
+        game.setBlock(item("dark_oak_fence"), line c + line d);
+        game.setBlock(item("red_concrete"), (line c - line d) + vec(0, 2, 0));
+        game.setBlock(item("white_concrete"), line c + vec(0, 2, 0));
+        game.setBlock(item("red_concrete"), (line c + line d) + vec(0, 2, 0));
+        game.setBlock(item("white_concrete"), (line c - line d) + vec(0, 1, 0));
+        game.setBlock(item("red_concrete"), line c + vec(0, 1, 0));
+        game.setBlock(item("white_concrete"), (line c + line d) + vec(0, 1, 0));
+    } else if (kind == "km") {
+        line at = loc(x, y, z);
+        game.setBlock(item("spruce_sign"), line at, "rotation=%var(b)");
+        game.changeSignText(line at, 1, s"<b>SS1");
+        game.changeSignText(line at, 2, s"KM %var(a)");
+    }
+}
+
+/** Text over the gantries and at the park; spawned again on every start
+ * of the car loop, because the plot removes entities when it restarts. */
+function mapDecor {
+    if (global mapTexts.len() > 0) {
+        select entitiesByName(global mapTexts as list[str]);
+        selectedEntity.remove();
+        select reset;
+    }
+    global mapTexts = [];
+    for (line row of mapStructs()) {
+        line f = (line row as str).split(" ");
+        line kind = line f[1] as str;
+        line x = num.parse(line f[2] as str) + 0.5;
+        line y = num.parse(line f[3] as str);
+        line z = num.parse(line f[4] as str) + 0.5;
+        if (line kind == "start") {
+            mapText(loc(line x, line y + 10.2, line z), s"<b><green>START</green></b>", 4);
+            mapText(loc(line x, line y + 13.4, line z), s"<b>SS1 KESTREL RIDGE</b>", 2);
+        } else if (line kind == "finish") {
+            mapText(loc(line x, line y + 10.2, line z), s"<b><red>FINISH</red></b>", 4);
+        } else if (line kind == "park") {
+            mapText(loc(line x + 20, 58, line z + 4), s"<b><yellow>SERVICE PARK</yellow></b>", 4);
+        }
+    }
+}
+
+function mapText(at: loc, text: txt, scale: num) {
+    game.spawnTextDisplay(at, text);
+    lastEntity.setDisplayBillboard(type="Vertical");
+    lastEntity.setDisplayScale(scale, scale, scale);
+    lastEntity.setDisplayViewRange(400);
+    global mapTexts.append(lastEntity.uuid);
+}

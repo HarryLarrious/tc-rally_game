@@ -1,0 +1,593 @@
+// The rally map. map/gen_map.py designs it and writes map_data.tc; this
+// file turns that data into blocks, a little each tick (see mapPace).
+//
+//   @map build [X0 Z0 X1 Z1]   everything (or only that plot-space area)
+//   @map terrain|road|structs|props|decor [X0 Z0 X1 Z1]   one phase
+//   @map wipe [X0 Z0 X1 Z1]    air from y 50 to 120 (before a rebuild)
+//   @map stop                  stop after the current row
+//   @map rate N                work budget per tick (default 40, see mapPace)
+//
+// Terrain: the heights of 126 x 126 nodes (8 blocks apart) are interpolated
+// with integer math: 64 x height = (8-u)(8-v) h00 + u(8-v) h10 + ... , so
+// gen_map.py knows every column's height exactly. Each row is cut in runs of
+// equal height and surface, and each run is one fill: stone down to the
+// old ground, a few blocks of sub soil, the surface, water up to the water
+// level and air above. Plants, sprinkled surface blocks, trees
+// and boulders come from the cell's letter (mapParams in map_data.tc).
+// Trees wait in a queue until the rows around them are built, because a
+// row clears the air above itself.
+
+declare global mapH: list;
+declare global mapC: list;
+declare global mapBusy: num;
+declare global mapStop: num;
+declare global mapOps: num;
+declare global mapRateMax: num;
+declare global mapPhase: str;
+declare global mapDone: num;
+declare global mapTotal: num;
+declare global mapX0: num;
+declare global mapZ0: num;
+declare global mapX1: num;
+declare global mapZ1: num;
+declare global mapQ1: list;
+declare global mapQ2: list;
+declare global mapQ3: list;
+declare global mapTexts: list;
+/** 1 once a build has finished: the texts are spawned on every start. */
+declare saved mapBuilt: num;
+declare global gMat: dict;
+declare global gSub: dict;
+declare global gBed: dict;
+declare global gDepth: dict;
+declare global gSpr: dict;
+declare global gSprN: dict;
+declare global gPlants: dict;
+declare global gPlantN: dict;
+declare global gTrees: dict;
+declare global gTreeN: dict;
+declare global gRockN: dict;
+
+/** Loads the map data into globals. */
+function mapLoad {
+    mapParams();
+    global mapH = mapH0();
+    for (line r of mapH1()) {
+        global mapH.append(line r);
+    }
+    for (line r of mapH2()) {
+        global mapH.append(line r);
+    }
+    for (line r of mapH3()) {
+        global mapH.append(line r);
+    }
+    global mapC = mapC0();
+    for (line r of mapC1()) {
+        global mapC.append(line r);
+    }
+}
+
+/** Node heights of node row k (1-based) as numbers. */
+function mapRowNums(k: num): list {
+    line out = [];
+    for (line t of (global mapH[k] as str).split(" ")) {
+        line out.append(num.parse(line t as str));
+    }
+    return line out;
+}
+
+/** Surface y of column (x, z), the same math as a terrain row. */
+function mapHeight(x: num, z: num): num {
+    line j = num.min(num.floor(z / 8), 124);
+    line v = z - 8 * line j;
+    line i = num.min(num.floor(x / 8), 124);
+    line u = x - 8 * line i;
+    line a = (global mapH[line j + 1] as str).split(" ");
+    line b = (global mapH[line j + 2] as str).split(" ");
+    line r0 = (8 - line v) * num.parse(line a[line i + 1] as str) + line v * num.parse(line b[line i + 1] as str);
+    line r1 = (8 - line v) * num.parse(line a[line i + 2] as str) + line v * num.parse(line b[line i + 2] as str);
+    return num.floor(((8 - line u) * line r0 + line u * line r1 + 32) / 64);
+}
+
+/** Paces a build. Work adds up in mapOps (about one unit per fill plus one
+ * per 300 blocks it changes); once a tick's budget is used up the build
+ * waits as many ticks as the work needs, and longer while the CPU is high.
+ * DiamondFire halts plot code that takes too much server time, and big
+ * block changes cost the server more than they cost the plot CPU meter. */
+function mapPace {
+    if (global mapOps < global mapRateMax) {
+        return;
+    }
+    line ticks = num.ceil(global mapOps / global mapRateMax);
+    global mapOps = 0;
+    line cpu = game.cpuUsage;
+    if (game.ticksSinceStartup % 10 < line ticks) {
+        line pct = num.floor(global mapDone * 100 / num.max(1, global mapTotal));
+        line ph = global mapPhase;
+        line c = num.round(line cpu);
+        allPlayers.sendActionBar(s"<gray>Map <yellow>%var(ph)</yellow> %var(pct)%  CPU %var(c)%");
+    }
+    wait(line ticks);
+    while (game.cpuUsage > 60 && global mapStop == 0) {
+        wait(10);
+    }
+}
+
+/** Adds work to the pace budget. */
+function mapCost(units: num) {
+    global mapOps += units;
+}
+
+/** True when the column is inside the build area. */
+function mapInArea(x: num, z: num): num {
+    if (x >= global mapX0 - 8 && x <= global mapX1 + 8 && z >= global mapZ0 - 8 && z <= global mapZ1 + 8) {
+        return 1;
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------- terrain
+
+/** Terrain of rows z0..z1, cells covering x0..x1. */
+function mapTerrain {
+    global mapPhase = "terrain";
+    global mapQ1 = [];
+    global mapQ2 = [];
+    global mapQ3 = [];
+    line ci0 = num.floor(global mapX0 / 8) + 1;
+    line ci1 = num.min(126, num.floor(global mapX1 / 8) + 1);
+    line z = global mapZ0;
+    line jc = -1;
+    line A = [];
+    line B = [];
+    line C = [];
+    global mapDone = 0;
+    global mapTotal = global mapZ1 - global mapZ0 + 1;
+    while (line z <= global mapZ1 && global mapStop == 0) {
+        line j = num.min(num.floor(line z / 8), 124);
+        if (line j != line jc) {
+            mapFlush(global mapQ1);
+            global mapQ1 = global mapQ2;
+            global mapQ2 = global mapQ3;
+            global mapQ3 = [];
+            line A = mapRowNums(line j + 1);
+            line B = mapRowNums(line j + 2);
+            line C = (global mapC[line j + 1] as str).split(" ");
+            line jc = line j;
+        }
+        mapTerrainRow(line z, line z - 8 * line j, line ci0, line ci1, line A, line B, line C);
+        line z += 1;
+        global mapDone += 1;
+        mapPace();
+    }
+    mapFlush(global mapQ1);
+    mapFlush(global mapQ2);
+    mapFlush(global mapQ3);
+    global mapQ1 = [];
+    global mapQ2 = [];
+    global mapQ3 = [];
+}
+
+/** One terrain row: z, its offset v in the node row, cells ci0..ci1
+ * (1-based, 126 is the last column x 1000 alone). */
+function mapTerrainRow(z: num, v: num, ci0: num, ci1: num, A: list, B: list, C: list) {
+    line R = [];
+    repeat (line k to 126) {
+        line R.append((8 - v) * (A[line k] as num) + v * (B[line k] as num));
+    }
+    line runH = -999;
+    line runL = "";
+    line runX = 0;
+    line xe = 0;
+    line ci = ci0;
+    while (line ci <= ci1) {
+        line r0: num = line R[line ci] as num;
+        line r1: num = line r0;
+        line ncol = 1;
+        if (line ci < 126) {
+            line r1 = line R[line ci + 1] as num;
+            line ncol = 8;
+        }
+        line L: str = C[num.min(line ci, 125)] as str;
+        line x0 = (line ci - 1) * 8;
+        line base = 8 * line r0 + 32;
+        line d = line r1 - line r0;
+        line hA = num.floor(line base / 64);
+        line hB = num.floor((line base + (line ncol - 1) * line d) / 64);
+        if (line hA == line hB) {
+            if (line hA != line runH || line L != line runL) {
+                if (line runH != -999) {
+                    mapRun(line runX, line x0 - 1, z, line runH, line runL);
+                }
+                line runX = line x0;
+                line runH = line hA;
+                line runL = line L;
+            }
+        } else {
+            repeat (line u to line ncol) {
+                line h = num.floor((line base + (line u - 1) * line d) / 64);
+                if (line h != line runH || line L != line runL) {
+                    if (line runH != -999) {
+                        mapRun(line runX, line x0 + line u - 2, z, line runH, line runL);
+                    }
+                    line runX = line x0 + line u - 1;
+                    line runH = line h;
+                    line runL = line L;
+                }
+            }
+        }
+        line xe = line x0 + line ncol - 1;
+        line ci += 1;
+    }
+    if (line runH != -999) {
+        mapRun(line runX, line xe, z, line runH, line runL);
+    }
+    // Plants and the rest after the fills, which clear the air above.
+    line ci = ci0;
+    while (line ci <= ci1) {
+        line r0: num = line R[line ci] as num;
+        line r1: num = line r0;
+        line ncol = 1;
+        if (line ci < 126) {
+            line r1 = line R[line ci + 1] as num;
+            line ncol = 8;
+        }
+        mapDecorate((line ci - 1) * 8, line ncol, z, 8 * line r0 + 32, line r1 - line r0, C[num.min(line ci, 125)] as str);
+        line ci += 1;
+    }
+}
+
+/** One run of equal height h and letter L on row z. */
+function mapRun(x0: num, x1: num, z: num, h: num, L: str) {
+    line wl = mapWaterLevel();
+    line mat: str = global gMat[L] as str;
+    line sub: str = global gSub[L] as str;
+    line depth: num = global gDepth[L] as num;
+    if (L == "c" || L == "C") {
+        line mat = ["terracotta", "orange_terracotta", "terracotta", "yellow_terracotta", "red_terracotta", "white_terracotta", "orange_terracotta", "brown_terracotta"][h % 8 + 1] as str;
+        line sub = line mat;
+    }
+    if (h < line wl) {
+        line mat = global gBed[L] as str;
+    }
+    // Solid down to the old ground: hollow hills would leave dark caves
+    // under them that the server must light, which is far slower.
+    mapCost(3 + (x1 - x0 + 1) * num.max(8, h - 42) / 150);
+    if (h > 50) {
+        game.setRegion(item("stone"), loc(x0, 50, z), loc(x1, num.max(50, h - line depth - 1), z));
+        game.setRegion(item(line sub), loc(x0, num.max(50, h - line depth), z), loc(x1, h - 1, z));
+    }
+    if (h < line wl) {
+        game.setRegion(item(line mat), loc(x0, h, z), loc(x1, h, z));
+        game.setRegion(item("water_bucket"), loc(x0, h + 1, z), loc(x1, line wl, z));
+        game.setRegion(item("air"), loc(x0, line wl + 1, z), loc(x1, 55, z));
+        return;
+    }
+    game.setRegion(item("air"), loc(x0, h + 1, z), loc(x1, num.max(h, 49) + 6, z));
+    if (L == "h" || L == "H") {
+        if (z % 9 == 4) {
+            game.setRegion(item("water_bucket"), loc(x0, h, z), loc(x1, h, z));
+        } else {
+            game.setRegion(item("farmland"), loc(x0, h, z), loc(x1, h, z), "moisture=7");
+            line crop = ["wheat_seeds", "carrot", "potato", "wheat_seeds"][(num.floor(x0 / 24) + num.floor(z / 27)) % 4 + 1] as str;
+            game.setRegion(item(line crop), loc(x0, h + 1, z), loc(x1, h + 1, z), "age=7");
+        }
+        return;
+    }
+    game.setRegion(item(line mat), loc(x0, h, z), loc(x1, h, z));
+}
+
+/** Plants, sprinkled surface blocks, trees and boulders for one cell's
+ * share of row z. */
+function mapDecorate(x0: num, ncol: num, z: num, base: num, d: num, L: str) {
+    line wl = mapWaterLevel();
+    // Plants (and seagrass on lake beds).
+    line pl: list = global gPlants[L] as list;
+    if (line pl.len() > 0) {
+        repeat (num.floor((global gPlantN[L] as num) / 8 + num.randomd(0, 1))) {
+            line u = num.min(line ncol - 1, num.floor(num.randomd(0, line ncol)));
+            line h = num.floor((base + line u * d) / 64);
+            line name = line pl[num.min(line pl.len(), num.floor(num.randomd(1, line pl.len() + 1)))] as str;
+            mapCost(1);
+            if (line name == "seagrass") {
+                if (line h < line wl - 1) {
+                    game.setBlock(item("seagrass"), loc(x0 + line u, line h + 1, z));
+                }
+            } else if (line h >= line wl) {
+                line bare = line name.replace("+", "");
+                if (line bare != line name) {
+                    game.setBlock(item(line bare), loc(x0 + line u, line h + 1, z), "half=lower");
+                    game.setBlock(item(line bare), loc(x0 + line u, line h + 2, z), "half=upper");
+                } else {
+                    game.setBlock(item(line name), loc(x0 + line u, line h + 1, z));
+                }
+            }
+        }
+    }
+    // Patches of a second surface block.
+    line sp: list = global gSpr[L] as list;
+    if (line sp.len() > 0) {
+        repeat (num.floor((global gSprN[L] as num) / 8 + num.randomd(0, 1))) {
+            line u = num.min(line ncol - 1, num.floor(num.randomd(0, line ncol)));
+            line h = num.floor((base + line u * d) / 64);
+            if (line h >= line wl || L == "l") {
+                line m = line sp[num.min(line sp.len(), num.floor(num.randomd(1, line sp.len() + 1)))] as str;
+                mapCost(1);
+                game.setBlock(item(line m), loc(x0 + line u, line h, z));
+            }
+        }
+    }
+    // Trees and boulders wait in the queue.
+    if (num.randomd(0, 8) < (global gTreeN[L] as num)) {
+        line u = num.min(line ncol - 1, num.floor(num.randomd(0, line ncol)));
+        line h = num.floor((base + line u * d) / 64);
+        if (line h > line wl) {
+            line tl: list = global gTrees[L] as list;
+            line t = line tl[num.min(line tl.len(), num.floor(num.randomd(1, line tl.len() + 1)))] as str;
+            line x = x0 + line u;
+            line y = line h + 1;
+            global mapQ3.append("%var(x);%var(y);%var(z);%var(t)");
+        }
+    }
+    if (num.randomd(0, 8) < (global gRockN[L] as num)) {
+        line u = num.min(line ncol - 1, num.floor(num.randomd(0, line ncol)));
+        line h = num.floor((base + line u * d) / 64);
+        if (line h >= line wl) {
+            line x = x0 + line u;
+            global mapQ3.append("%var(x);%var(h);%var(z);B");
+        }
+    }
+}
+
+/** Plants the queued trees and boulders. */
+function mapFlush(q: list) {
+    for (line t of q) {
+        line f = (line t as str).split(";");
+        line at = loc(num.parse(line f[1] as str), num.parse(line f[2] as str), num.parse(line f[3] as str));
+        line ty = line f[4] as str;
+        if (line ty == "B") {
+            mapBoulder(line at);
+            mapCost(3);
+        } else {
+            game.generateTree(line at, type=line ty);
+            mapCost(8);
+        }
+    }
+}
+
+/** A mossy boulder sunk into the ground at `at`. */
+function mapBoulder(at: loc) {
+    line mats = ["stone", "andesite", "cobblestone", "mossy_cobblestone", "tuff", "stone"];
+    line m = line mats[num.floor(num.randomd(1, 7))] as str;
+    line m2 = line mats[num.floor(num.randomd(1, 7))] as str;
+    game.setRegion(item(line m), at, at + vec(1, 1, 1));
+    game.setBlock(item(line m2), at + vec(num.floor(num.randomd(0, 2)), 2, num.floor(num.randomd(0, 2))));
+    if (num.randomd(0, 1) < 0.5) {
+        game.setRegion(item(line m2), at + vec(-1, 0, 0), at + vec(-1, 1, 1));
+        game.setBlock(item("mossy_cobblestone"), at + vec(2, 1, 0));
+    }
+}
+
+/** Clears the area to air from y 50 to 120 (old trees and builds), one
+ * row at a time. */
+function mapWipe {
+    global mapPhase = "wipe";
+    global mapDone = 0;
+    global mapTotal = global mapZ1 - global mapZ0 + 1;
+    line z = global mapZ0;
+    while (line z <= global mapZ1 && global mapStop == 0) {
+        game.setRegion(item("air"), loc(global mapX0, 50, line z), loc(global mapX1, 120, line z));
+        mapCost(1 + (global mapX1 - global mapX0 + 1) * 71 / 600);
+        line z += 1;
+        global mapDone += 1;
+        mapPace();
+    }
+}
+
+// ---------------------------------------------------------------- road
+
+/** The road points as lists [x, z, r2, s]. */
+function mapRoadPoints(): list {
+    line out = [];
+    for (line row of mapRoad()) {
+        for (line p of (line row as str).split(",")) {
+            line f = (line p as str).split(" ");
+            line out.append([num.parse(line f[1] as str), num.parse(line f[2] as str), num.parse(line f[3] as str), line f[4] as str]);
+        }
+    }
+    return line out;
+}
+
+/** Stamps the road in two passes: verges first, then the road itself, so a
+ * later verge never covers an earlier piece of road. */
+function mapRoadBuild {
+    line pts = mapRoadPoints();
+    line np = line pts.len();
+    global mapDone = 0;
+    global mapTotal = line np * 2;
+    repeat (line pass to 2) {
+        global mapPhase = "road %var(pass)/2";
+        repeat (line k to line np) {
+            if (global mapStop == 1) {
+                return;
+            }
+            line p = line pts[line k] as list;
+            line q = line pts[line k % line np + 1] as list;
+            line s = line p[4] as str;
+            if (line s != "b" && mapInArea(line p[1] as num, line p[2] as num) == 1) {
+                repeat (line i to 3) {
+                    line t = (line i - 1) / 3;
+                    line x = num.floor((line p[1] as num) + ((line q[1] as num) - (line p[1] as num)) * line t);
+                    line z = num.floor((line p[2] as num) + ((line q[2] as num) - (line p[2] as num)) * line t);
+                    line r2 = num.round((line p[3] as num) + ((line q[3] as num) - (line p[3] as num)) * line t);
+                    if (line pass == 1) {
+                        mapVerge(line x, line z, line r2, line s);
+                        mapCost(14);
+                    } else {
+                        mapStamp(line x, line z, line r2, line s);
+                        mapCost(6);
+                    }
+                }
+            }
+            global mapDone += 1;
+            mapPace();
+        }
+    }
+}
+
+/** Pass 1: a 13 x 13 flat verge at the road height, cleared above. */
+function mapVerge(x: num, z: num, r2: num, s: str) {
+    line hb = num.floor(r2 / 2);
+    line a = loc(x - 6, 0, z - 6);
+    line b = loc(x + 6, 0, z + 6);
+    line clear = 12;
+    if (s == "c") {
+        line clear = 34;
+    }
+    if (s == "w") {
+        game.setRegion(item("stone"), loc(x - 6, line hb - 3, z - 6), loc(x + 6, line hb - 1, z + 6));
+        game.setRegion(item("gravel"), loc(x - 6, line hb, z - 6), loc(x + 6, line hb, z + 6));
+        game.setRegion(item("water_bucket"), loc(x - 6, line hb + 1, z - 6), loc(x + 6, mapWaterLevel(), z + 6));
+        game.setRegion(item("air"), loc(x - 6, mapWaterLevel() + 1, z - 6), loc(x + 6, line hb + line clear, z + 6));
+        return;
+    }
+    line top = "grass_block";
+    line sub = "dirt";
+    if (s == "r") {
+        line top = "coarse_dirt";
+        line sub = "stone";
+    } else if (s == "s") {
+        line top = "snow_block";
+        line sub = "stone";
+    } else if (s == "c") {
+        line top = "coarse_dirt";
+        line sub = "terracotta";
+    }
+    game.setRegion(item(line sub), loc(x - 6, line hb - 3, z - 6), loc(x + 6, line hb - 1, z + 6));
+    game.setRegion(item(line top), loc(x - 6, line hb, z - 6), loc(x + 6, line hb, z + 6));
+    game.setRegion(item("air"), loc(x - 6, line hb + 1, z - 6), loc(x + 6, line hb + line clear, z + 6));
+}
+
+/** Pass 2: the 7 x 7 road piece, with a slab on top for half heights. */
+function mapStamp(x: num, z: num, r2: num, s: str) {
+    line hb = num.floor(r2 / 2);
+    line slab = r2 - line hb * 2;
+    line surf = "gravel";
+    line half = "tuff_slab";
+    line sub = "dirt";
+    if (s == "a") {
+        line surf = "gray_concrete";
+        line half = "polished_deepslate_slab";
+        line sub = "stone";
+    } else if (s == "d" || s == "c") {
+        line surf = "coarse_dirt";
+        line half = "mud_brick_slab";
+    } else if (s == "s") {
+        line surf = "snow_block";
+        line half = "smooth_quartz_slab";
+        line sub = "stone";
+    } else if (s == "r") {
+        line sub = "stone";
+    }
+    game.setRegion(item(line sub), loc(x - 3, line hb - 1, z - 3), loc(x + 3, line hb - 1, z + 3));
+    game.setRegion(item(line surf), loc(x - 3, line hb, z - 3), loc(x + 3, line hb, z + 3));
+    if (line slab == 1) {
+        if (s == "w") {
+            game.setRegion(item(line half), loc(x - 3, line hb + 1, z - 3), loc(x + 3, line hb + 1, z + 3), "type=bottom,waterlogged=true");
+        } else {
+            game.setRegion(item(line half), loc(x - 3, line hb + 1, z - 3), loc(x + 3, line hb + 1, z + 3), "type=bottom");
+        }
+    } else {
+        game.setRegion(item("air"), loc(x - 3, line hb + 1, z - 3), loc(x + 3, line hb + 1, z + 3));
+    }
+    game.setRegion(item("air"), loc(x - 3, line hb + 2, z - 3), loc(x + 3, line hb + 4, z + 3));
+}
+
+// ---------------------------------------------------------------- builds
+
+/** Runs the given phases ("all" or one name) over the set area. */
+process mapBuild {
+    global mapBusy = 1;
+    global mapStop = 0;
+    global mapOps = 0;
+    if (global mapRateMax == 0) {
+        global mapRateMax = 40;
+    }
+    mapLoad();
+    line what = global mapPhase;
+    if (line what == "wipe") {
+        mapWipe();
+    }
+    if (line what == "all" || line what == "terrain") {
+        mapTerrain();
+    }
+    if ((line what == "all" || line what == "road") && global mapStop == 0) {
+        mapRoadBuild();
+    }
+    // The road clears 6 blocks each side of its middle, so after it the
+    // gantries, posts and hay bales go back too.
+    if ((line what == "all" || line what == "road" || line what == "structs") && global mapStop == 0) {
+        mapStructsBuild();
+    }
+    if ((line what == "all" || line what == "road" || line what == "props") && global mapStop == 0) {
+        mapPropsBuild();
+    }
+    if (global mapStop == 0) {
+        mapDecor();
+        saved mapBuilt = 1;
+    }
+    global mapBusy = 0;
+    if (global mapStop == 1) {
+        allPlayers.sendMessage(s"<gray>Map build stopped.");
+    } else {
+        allPlayers.sendMessage(s"<green>Map built.</green> <gray>Type <yellow>@start</yellow> to drive the stage.");
+    }
+}
+
+/** @map ... */
+function mapCommand(words: list) {
+    line what = "";
+    if (words.len() >= 2) {
+        line what = words[2] as str;
+    }
+    if (line what == "stop") {
+        global mapStop = 1;
+        return;
+    }
+    if (line what == "rate") {
+        // Work units per tick (default 40).
+        global mapRateMax = num.parse(words[3] as str);
+        return;
+    }
+    if (line what == "status") {
+        line ph = global mapPhase;
+        line b = global mapBusy;
+        line d = global mapDone;
+        line t = global mapTotal;
+        default.sendMessage(s"<gray>Map busy %var(b), phase %var(ph), %var(d)/%var(t)");
+        return;
+    }
+    if (line what == "build") {
+        line what = "all";
+    }
+    if (line what != "all" && line what != "wipe" && line what != "terrain" && line what != "road" && line what != "structs" && line what != "props" && line what != "decor") {
+        default.sendMessage(s"<gray>Usage: <yellow>@map build|terrain|road|structs|props|decor [X0 Z0 X1 Z1]</yellow>, <yellow>@map stop</yellow>, <yellow>@map rate N</yellow>");
+        return;
+    }
+    if (global mapBusy == 1) {
+        default.sendMessage(s"<gray>The map is still building (<yellow>@map stop</yellow>).");
+        return;
+    }
+    global mapX0 = 0;
+    global mapZ0 = 0;
+    global mapX1 = 1000;
+    global mapZ1 = 1000;
+    if (words.len() >= 6) {
+        global mapX0 = num.max(0, num.min(num.parse(words[3] as str), num.parse(words[5] as str)));
+        global mapX1 = num.min(1000, num.max(num.parse(words[3] as str), num.parse(words[5] as str)));
+        global mapZ0 = num.max(0, num.min(num.parse(words[4] as str), num.parse(words[6] as str)));
+        global mapZ1 = num.min(1000, num.max(num.parse(words[4] as str), num.parse(words[6] as str)));
+    }
+    global mapPhase = line what;
+    start mapBuild;
+}

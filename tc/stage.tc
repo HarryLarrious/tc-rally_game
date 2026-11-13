@@ -1,0 +1,115 @@
+// The stage: @start puts you in a car before the start line; crossing it
+// starts the clock, the checkpoints along the road must be passed in order
+// and the finish line stops it. The best time is kept.
+
+/** Checkpoints (vec), the start line first and the finish line last. */
+declare global stPts: list;
+/** Per car: the next checkpoint (0: not on a run) and the start tick. */
+declare global stK: list;
+declare global stT: list;
+declare saved stBest: num;
+declare saved stBestName: str;
+
+function stageLoad {
+    global stPts = mapCheckpoints();
+}
+
+/** "m:ss.s" for t seconds. */
+function stageTime(t: num): str {
+    line m = num.floor(t / 60);
+    line s = num.floor((t - line m * 60) * 10) / 10;
+    if (line s < 10) {
+        return "%var(m):0%var(s)";
+    }
+    return "%var(m):%var(s)";
+}
+
+/** Called every tick for a driven car. */
+function stageTick(c: num) {
+    if (global stPts.len() < 2) {
+        return;
+    }
+    while (global stK.len() < c) {
+        global stK.append(0);
+        global stT.append(0);
+    }
+    line p = global cPos[c] as vec;
+    line k = global stK[c] as num;
+    if (line k == 0) {
+        line s = global stPts[1] as vec;
+        if (vec(line p.x - line s.x, 0, line p.z - line s.z).len() < 5 && num.abs(line p.y - line s.y) < 4) {
+            global stK[c] = 2;
+            global stT[c] = global rTick;
+            select playersByName(global cDriver[c]);
+            selected.sendTitle(s"<green><b>GO!", s"", 20, 0, 10);
+            selected.playSound(snd("Bell", 1.5, 1));
+            select reset;
+        }
+        return;
+    }
+    line q = global stPts[line k] as vec;
+    if (vec(line p.x - line q.x, 0, line p.z - line q.z).len() > 12) {
+        return;
+    }
+    line t = (global rTick - (global stT[c] as num)) / 20;
+    line ts = stageTime(line t);
+    select playersByName(global cDriver[c]);
+    if (line k < global stPts.len()) {
+        global stK[c] = line k + 1;
+        line cp = line k - 1;
+        selected.sendTitle(s"", s"<yellow>Split %var(cp): %var(ts)", 30, 0, 10);
+        selected.playSound(snd("Pling", 1.5, 1));
+    } else {
+        global stK[c] = 0;
+        line name: str = "%selected";
+        allPlayers.sendMessage(s"<gold><b>SS1</b></gold> <white>%var(name)</white> <gray>finished in</gray> <yellow><b>%var(ts)</b></yellow>");
+        if (saved stBest == 0 || line t < saved stBest) {
+            saved stBest = line t;
+            saved stBestName = line name;
+            allPlayers.sendMessage(s"<gold>New stage record!");
+        }
+        selected.sendTitle(s"<yellow><b>%var(ts)", s"<gray>Stage time", 60, 5, 20);
+        selected.playSound(snd("Challenge Complete", 1, 1));
+    }
+    select reset;
+}
+
+/** Stage clock text for the HUD, or "" when not on a run. */
+function stageHud(c: num): str {
+    if (global stK.len() < c) {
+        return "";
+    }
+    if (global stK[c] as num == 0) {
+        return "";
+    }
+    line t = (global rTick - (global stT[c] as num)) / 20;
+    return stageTime(line t);
+}
+
+/** @start: a car before the start line, with you in it. */
+function startCommand {
+    if (carOf(default.uuid) != 0) {
+        exitCar();
+    }
+    ensureLoop();
+    line at = mapStartLoc();
+    line yaw: num = line at.getCoordinate(coord="Yaw");
+    // Stand beside the spot first, so its chunks load before the car spawns.
+    line side = vec(num.cos(line yaw), 0, num.sin(line yaw)) * 2;
+    default.teleport(loc(line at.x + line side.x, line at.y + 0.2, line at.z + line side.z, 0, line yaw));
+    default.setToAdventureMode();
+    wait(10);
+    line k = global carCount % carPaints().len() + 1;
+    line c = spawnCar(line at, carPaints()[line k] as num, carAccents()[line k] as num);
+    enterNearestCar();
+    while (global stK.len() < line c) {
+        global stK.append(0);
+        global stT.append(0);
+    }
+    global stK[line c] = 0;
+    if (saved stBest > 0) {
+        line b = stageTime(saved stBest);
+        line who = saved stBestName;
+        default.sendMessage(s"<gray>Stage record: <yellow>%var(b)</yellow> by %var(who).");
+    }
+}

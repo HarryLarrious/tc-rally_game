@@ -1,0 +1,118 @@
+// Teleport helpers for building and looking around the map.
+//
+// Plot space is what DiamondFire code uses: x and z from the plot corner,
+// y as in the world. Absolute is what F3 shows; the difference is the plot
+// origin, which @origin records once (stand still, read F3, type it).
+//
+//   @where                     plot position, facing and the absolute one
+//   @tp X Y Z [YAW [PITCH]]    plot space
+//   @tpa X Y Z [YAW [PITCH]]   absolute (F3) coordinates
+//   @tpr DX DY DZ [DYAW [DPITCH]]   relative, world axes
+//   @tpf FWD [UP [RIGHT]]      relative to where you look (flat)
+//   @look YAW [PITCH]          turn without moving
+//   @origin X Y Z              your F3 position now: sets the plot origin
+//   @spec                      spectator (fly through blocks)
+//   @fly                       creative and flying
+//   @walk                      adventure, back on your feet
+
+/** Absolute world position of plot (0, 0, 0). */
+declare saved plotOrigin: vec;
+
+/** Number argument i of words, or fallback when it is missing. */
+function argNum(words: list, i: num, fallback: num): num {
+    if (words.len() >= i) {
+        return num.parse(words[i] as str);
+    }
+    return fallback;
+}
+
+/** Teleports the player to plot-space (x, y, z) facing yaw/pitch. */
+function tpPlot(x: num, y: num, z: num, yaw: num, pitch: num) {
+    default.teleport(loc(x, y, z, pitch, yaw));
+}
+
+function whereCommand {
+    line p = default.location;
+    line yaw = num.round(line p.getCoordinate(coord="Yaw") * 10) / 10;
+    line pitch = num.round(line p.getCoordinate(coord="Pitch") * 10) / 10;
+    line x = num.round(line p.x * 10) / 10;
+    line y = num.round(line p.y * 10) / 10;
+    line z = num.round(line p.z * 10) / 10;
+    line o = saved plotOrigin;
+    line ax = num.round((line p.x + line o.x) * 10) / 10;
+    line ay = num.round((line p.y + line o.y) * 10) / 10;
+    line az = num.round((line p.z + line o.z) * 10) / 10;
+    line size = game.plotSize;
+    default.sendMessage(s"<gray>Plot <white>%var(x) %var(y) %var(z)</white> yaw <white>%var(yaw)</white> pitch <white>%var(pitch)</white> | abs <white>%var(ax) %var(ay) %var(az)</white> | plot size %var(size)");
+}
+
+/** The tp commands; returns 1 when cmd was one of them. */
+function tpCommand(cmd: str, words: list): num {
+    line p = default.location;
+    line yaw: num = line p.getCoordinate(coord="Yaw");
+    line pitch: num = line p.getCoordinate(coord="Pitch");
+    if (cmd == "where") {
+        whereCommand();
+    } else if (cmd == "tp") {
+        if (words.len() < 4) {
+            default.sendMessage(s"<gray>Usage: <yellow>@tp X Y Z [YAW [PITCH]]</yellow> (plot space)");
+            return 1;
+        }
+        tpPlot(argNum(words, 2, 0), argNum(words, 3, 0), argNum(words, 4, 0), argNum(words, 5, line yaw), argNum(words, 6, line pitch));
+    } else if (cmd == "tpa") {
+        if (words.len() < 4) {
+            default.sendMessage(s"<gray>Usage: <yellow>@tpa X Y Z [YAW [PITCH]]</yellow> (F3 coordinates)");
+            return 1;
+        }
+        line o = saved plotOrigin;
+        tpPlot(argNum(words, 2, 0) - line o.x, argNum(words, 3, 0) - line o.y, argNum(words, 4, 0) - line o.z, argNum(words, 5, line yaw), argNum(words, 6, line pitch));
+    } else if (cmd == "tpr") {
+        tpPlot(line p.x + argNum(words, 2, 0), line p.y + argNum(words, 3, 0), line p.z + argNum(words, 4, 0), line yaw + argNum(words, 5, 0), line pitch + argNum(words, 6, 0));
+    } else if (cmd == "tpf") {
+        line f = argNum(words, 2, 0);
+        line u = argNum(words, 3, 0);
+        line r = argNum(words, 4, 0);
+        // Flat forward and right from the yaw (MC yaw 0 = +z, 90 = -x).
+        line fx = 0 - num.sin(line yaw);
+        line fz = num.cos(line yaw);
+        tpPlot(line p.x + line fx * line f - line fz * line r, line p.y + line u, line p.z + line fz * line f + line fx * line r, line yaw, line pitch);
+    } else if (cmd == "look") {
+        tpPlot(line p.x, line p.y, line p.z, argNum(words, 2, line yaw), argNum(words, 3, line pitch));
+    } else if (cmd == "origin") {
+        if (words.len() < 4) {
+            default.sendMessage(s"<gray>Usage: <yellow>@origin X Y Z</yellow> with your F3 position");
+            return 1;
+        }
+        saved plotOrigin = vec(argNum(words, 2, 0) - line p.x, argNum(words, 3, 0) - line p.y, argNum(words, 4, 0) - line p.z);
+        line o = saved plotOrigin;
+        default.sendMessage(s"<gray>Plot origin set to <white>%var(o)");
+    } else if (cmd == "probe") {
+        // Lists the non-air blocks in this column, top down (first 12).
+        line out = "";
+        line n = 0;
+        line top = 0;
+        line y = 319;
+        while (line y >= -64 && line n < 12) {
+            line m = game.getBlockMaterial(loc(line p.x, line y, line p.z));
+            if (line m == "void_air" && line n == 0) {
+                line top = line y;
+            } else if (line m != "air") {
+                line out = "%var(out) %var(y):%var(m)";
+                line n += 1;
+            }
+            line y -= 1;
+        }
+        default.sendMessage(s"<gray>Void up to %var(top). Column:%var(out)");
+    } else if (cmd == "spec") {
+        default.setToSpectatorMode();
+    } else if (cmd == "fly") {
+        default.setToCreativeMode();
+        default.setAllowFlight(allow="Enable");
+        default.setFlying(flying="Enable");
+    } else if (cmd == "walk") {
+        default.setToAdventureMode();
+    } else {
+        return 0;
+    }
+    return 1;
+}

@@ -79,7 +79,10 @@ function loadSurfaces {
         grass_block: 0.62, mycelium: 0.6, moss_block: 0.55, farmland: 0.6, clay: 0.6, mud: 0.45,
         sand: 0.5, red_sand: 0.5, soul_sand: 0.4, snow_block: 0.4, snow: 0.4, powder_snow: 0.3,
         ice: 0.12, packed_ice: 0.1, blue_ice: 0.08, andesite_slab: 0.95, smooth_stone_slab: 1.0,
-        white_concrete: 1.05, black_concrete: 1.05, terracotta: 0.85, red_terracotta: 0.85
+        white_concrete: 1.05, black_concrete: 1.05, terracotta: 0.85, red_terracotta: 0.85,
+        tuff_slab: 0.7, mud_brick_slab: 0.72, smooth_quartz_slab: 0.42, polished_deepslate_slab: 1.05,
+        spruce_planks: 0.85, orange_terracotta: 0.85, yellow_terracotta: 0.85, white_terracotta: 0.85,
+        brown_terracotta: 0.85, polished_andesite_slab: 1.0, hay_block: 0.5
     };
 }
 

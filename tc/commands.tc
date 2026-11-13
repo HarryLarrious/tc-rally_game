@@ -4,11 +4,25 @@
 playerevent join {
     packSend();
     ensureLoop();
+    parkSpawn();
+}
+
+playerevent respawn {
+    parkSpawn();
+}
+
+/** The service park, looking at the start straight. The plot's own spawn
+ * (10, 50, 10) is inside the hills at the map edge. */
+function parkSpawn {
+    default.teleport(loc(600.5, 51, 955.5, 0, 180));
 }
 
 playerevent command {
     line words = event.command.split(" ");
     line cmd = (line words[1] as str).replace("@", "");
+    if (tpCommand(line cmd, line words) == 1) {
+        return;
+    }
     if (line cmd == "car") {
         // @car [turn degrees]: turn 90 shows the car's left side.
         line turn = 0;
@@ -43,6 +57,10 @@ playerevent command {
             fixCar(line c);
             default.sendMessage(s"<gray>Car %var(c) repaired.");
         }
+    } else if (line cmd == "map") {
+        mapCommand(line words);
+    } else if (line cmd == "start") {
+        startCommand();
     } else if (line cmd == "track") {
         trackCommand(line words);
     } else if (line cmd == "dbg") {
@@ -58,7 +76,7 @@ playerevent command {
     } else if (line cmd == "pack") {
         packSend();
     } else {
-        default.sendMessage(s"<gray>Commands: <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@track build|clear</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
+        default.sendMessage(s"<gray>Commands: <yellow>@start</yellow>, <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@map build|stop</yellow>, <yellow>@tp/@tpa/@tpr/@tpf/@look/@where</yellow>, <yellow>@spec/@fly/@walk</yellow>, <yellow>@track build|clear</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
     }
 }
 

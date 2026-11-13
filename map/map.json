@@ -1,0 +1,13 @@
+{
+ "road_length": 3445,
+ "start": [
+  640.1,
+  902.0
+ ],
+ "nodes_range": [
+  37,
+  150
+ ],
+ "props": 298,
+ "structs": 33
+}

@@ -15,6 +15,7 @@ separate parts, so they can be damaged and broken apart.
 | [pack/src/engine_sound.py](pack/src/engine_sound.py) | Synthesizes the engine sound loops |
 | [tools/build_pack.py](tools/build_pack.py) | Validates, zips and publishes the pack to the `pack-dist` branch |
 | [tools/viewer/](tools/viewer/) | 3D viewer for the car models |
+| [map/gen_map.py](map/gen_map.py) | Designs the rally map and writes `tc/map_data.tc` and [map/preview.png](map/preview.png) |
 
 ## Build the car
 
@@ -38,6 +39,14 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 
 | Command | Effect |
 | --- | --- |
+| `@start` | Put a car before the stage start line with you in it; the clock runs from the start line to the finish |
+| `@map build [X0 Z0 X1 Z1]` | Build the whole map (or only that plot-space area); `@map terrain\|road\|structs\|props\|decor\|wipe [area]` builds one phase, `@map stop` stops |
+| `@tp X Y Z [YAW [PITCH]]` | Teleport in plot space (what the code uses: x and z from the plot corner) |
+| `@tpa X Y Z [YAW [PITCH]]` | Teleport to absolute (F3) coordinates; `@origin X Y Z` with your F3 position sets the plot origin first |
+| `@tpr DX DY DZ [DYAW [DPITCH]]` | Teleport relative, world axes |
+| `@tpf FWD [UP [RIGHT]]` | Teleport relative to where you look |
+| `@look YAW [PITCH]`, `@where` | Turn on the spot; show plot and absolute position |
+| `@spec`, `@fly`, `@walk` | Spectator, creative flying, adventure |
 | `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
 | `@drive` | Get in the nearest free car within 8 blocks |
 | `@exit` | Get out (same as F) |
@@ -52,6 +61,47 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | `@carcheck` | List the newest car's parts that have no display |
 | `@clearcars` | Remove every car |
 | `@pack` | Send the resource pack again |
+
+## The map
+
+The plot (206003, Mega) is a 1001 x 1001 block rally map: plot x and z
+0..1000 (absolute x 100000.., z 4000..), ground at y 49, build limit 255.
+`map/gen_map.py` designs it (needs numpy, scipy and Pillow):
+
+```bash
+python3 map/gen_map.py
+```
+
+![map](map/preview.png)
+
+**SS1 Kestrel Ridge**, a 3.4 km loop. From the service park it runs west
+along the start straight and through a water splash in the creek, then
+round the lake on dirt and north through the village on asphalt. Forest
+twisties with a crest jump follow, then a wooden bridge over the river,
+the middle woods and a rocky climb with a hairpin. The road crosses a snowy
+pass under the north-east mountains, takes the big jump on the descent and
+goes through a terracotta canyon. Gravel brings it back to the flying
+finish. Hay bales line the bends, with red and white marker posts, chevron
+boards at the hairpins, kilometre signs, and spectator stands at the splash,
+the jumps and the hairpins.
+
+The plot code (`tc/map.tc`, `tc/map_build.tc`) builds it from compact data:
+terrain heights every 8 blocks (interpolated exactly the same way in both
+places), one surface letter per 8 x 8 cell (meadow, oak and spruce forest,
+dark forest, rock, snow, canyon, lake bed, farm, village), the road every
+3 blocks, the props and the structures. It works a few rows or road
+stamps per tick and slows down when the plot CPU rises. Trees are
+Minecraft's own (Generate Tree). `@map build` takes about 20 minutes on a
+Mega plot (the client gets few chunk updates while it runs); run
+`@map wipe` first to rebuild over an old build. `@map road` also rebuilds
+the structures and props, because the road clears 6 blocks each side.
+Players join and respawn at the service park, since the plot spawn is
+inside the hills at the map edge.
+
+`tc/stage.tc` times the stage: the clock starts at the start line and
+stops at the finish line, with split checkpoints along the road that must
+be passed in order. The HUD shows the stage time, and the best time is
+saved.
 
 ## Driving
 
