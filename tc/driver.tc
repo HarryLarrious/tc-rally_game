@@ -142,12 +142,13 @@ function driverArm(id: str, s: vec, h: vec, width: num, L: vec, U: vec, F: vec) 
     driverPart(id, line a, line up, line f, width, 12 * line k, 4, s + line b * (4 * global dPx * line k), L, U, F);
 }
 
-/** Draws the driver model of car c (its driver must have one). `at` is the
- * car origin all its displays stand on. */
-function driverRender(c: num, at: loc, L: vec, U: vec, F: vec) {
+/** Draws the driver model of car c and returns where the driver's eye goes
+ * (car frame): between the model's eyes, a little inside its face. `at` is
+ * the car origin all its displays stand on. */
+function driverRender(c: num, at: loc, L: vec, U: vec, F: vec): vec {
     line uuid = global cDriver[c];
     if (!global dOf.hasKeys(line uuid)) {
-        return;
+        return vec(0.33, 1.2, -0.12);
     }
     line ids = global dOf[line uuid] as list[str];
     select entitiesByName(line ids);
@@ -166,7 +167,8 @@ function driverRender(c: num, at: loc, L: vec, U: vec, F: vec) {
     line hf = vec(line dir.dot(L), num.clamp(line dir.dot(U), -0.6, 0.5), num.max(line dir.dot(F), 0.25)).setLength(1);
     line hl = vec(0, 1, 0).cross(line hf).setLength(1);
     line hu = line hf.cross(line hl);
-    driverPart(line ids[1], line hl, line hu, line hf, 8, 8, 8, global dNeck + line hu * (4 * global dPx), L, U, F);
+    line headC = global dNeck + line hu * (4 * global dPx);
+    driverPart(line ids[1], line hl, line hu, line hf, 8, 8, 8, line headC, L, U, F);
 
     // Hands on the rim, turning with the wheel up to 60 degrees (then the
     // wheel slides through them).
@@ -201,6 +203,9 @@ function driverRender(c: num, at: loc, L: vec, U: vec, F: vec) {
     }
     driverArm(line ids[2], global dShoulderR, line handR, line width, L, U, F);
     driverArm(line ids[3], global dShoulderL, line handL, line width, L, U, F);
+    // Eye: 0.5 px above and 2.5 px in front of the head's center (the face is
+    // 4 px out), so the camera sees from the model's eyes.
+    return line headC + line hu * (0.5 * global dPx) + line hf * (2.5 * global dPx);
 }
 
 /** @dkeep: toggles leaving the model in the car on getting out (to look at

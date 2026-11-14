@@ -623,3 +623,15 @@ function carUpright(c: num) {
     global cAwake[c] = 60;
     global cGrace[c] = 40;
 }
+
+/** Debug (@flip): rolls car c onto its roof, a little above the ground, so
+ * it lands upside down. */
+function carFlip(c: num) {
+    global cU[c] = (global cU[c] as vec) * -1;
+    global cL[c] = (global cL[c] as vec) * -1;
+    global cVel[c] = vec(0, 0, 0);
+    global cW[c] = vec(0, 0, 0);
+    global cPos[c] = global cPos[c] + vec(0, 1.5, 0);
+    global cAwake[c] = 60;
+    global cGrace[c] = 40;
+}

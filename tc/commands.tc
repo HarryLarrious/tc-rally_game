@@ -48,6 +48,12 @@ playerevent command {
         enterNearestCar();
     } else if (line cmd == "exit") {
         exitCar();
+    } else if (line cmd == "flip") {
+        // @flip: debug, rolls your car (or the nearest) onto its roof.
+        line c = carNear(default.uuid);
+        if (line c != 0) {
+            carFlip(line c);
+        }
     } else if (line cmd == "dkeep") {
         // @dkeep: debug, getting out leaves the driver model in the car.
         driverKeepToggle();

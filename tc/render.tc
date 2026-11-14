@@ -40,14 +40,6 @@ function carRender(c: num) {
     selectedEntity.setDisplayInterpolation(1, 0);
     select reset;
 
-    // The driver's seat, on the left seat cushion. A rider's eye is 1.03 above
-    // the seat entity, so this puts the first-person camera at (0.33, 1.2,
-    // -0.2): inside the driver model's head, a little behind its center.
-    line seat = line o + L * 0.33 + U * 0.17 - F * 0.2;
-    select entitiesByName(global cSeat[c]);
-    selectedEntity.teleport(loc(line seat.x, line seat.y, line seat.z));
-    select reset;
-
     line move = global cMove[c] as list;
     line links = global rTick % global linkEvery == 0;
     line steer = global cSteer[c];
@@ -63,9 +55,20 @@ function carRender(c: num) {
     line ca = num.cos(line a);
     line sa = num.sin(line a);
     setMover(line move[21] as str, vec(line ca, line sa * line ct, line sa * line st), vec(0 - line sa, line ca * line ct, line ca * line st), vec(0, 0 - line st, line ct), vec(global gSteerX, global gSteerY, global gSteerZ), L, U, F, 1);
+    // The driver's eye, in the car frame: in the driver model's head (it
+    // turns with the player's look), or where that head would be.
+    line eye = vec(0.33, 1.2, -0.12);
     if (global cDriver[c] != "") {
-        driverRender(c, line at, L, U, F);
+        line eye = driverRender(c, line at, L, U, F);
     }
+    // The seat: a rider's eye is 1.03 straight above the seat entity (seat
+    // top 0.01, rider attachment -0.6, eye height 1.62), whichever way the
+    // car is turned, so the seat goes 1.03 below the eye. The camera then
+    // stays in the head even upside down instead of poking out of the car.
+    line ew = line o + L * line eye.x + U * line eye.y + F * line eye.z;
+    select entitiesByName(global cSeat[c]);
+    selectedEntity.teleport(loc(line ew.x, line ew.y - 1.03, line ew.z));
+    select reset;
 }
 
 /** Draws corner i of car c: wheel and upright every tick; arm, spring and

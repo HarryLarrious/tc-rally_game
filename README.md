@@ -57,6 +57,7 @@ the way the 26.3 client does, once per define set the game uses for it
 | `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
 | `@drive` | Get in the nearest free car within 8 blocks |
 | `@exit` | Get out (same as F) |
+| `@flip` | Debug: roll your car (or the nearest) onto its roof |
 | `@dkeep` | Debug: getting out leaves the driver model where it sat, to look at it from outside; `@dkeep` again removes those |
 | `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, smooth, links |
 | `@dbg` | Toggle the physics debug readout in the action bar |
@@ -132,8 +133,11 @@ and the Roadbook in their hand turns into an item that draws nothing. The
 model's head looks where the player looks (within what a neck allows), the
 hands hold the steering wheel and turn it up to 60 degrees, the right hand
 goes to the gear lever on each shift and to the handbrake while it is pulled.
-In first person the driver sees their arms on the wheel; the head is not
-drawn when the camera is inside it.
+In first person the driver looks out of the model's eyes and sees their arms
+on the wheel; the head is not drawn when the camera is inside it. The seat
+entity is moved every tick so the rider's eye (always 1.03 straight above
+the seat) lands between the model's eyes, which turn with the head, so the
+camera stays inside the car even when it lies on its roof.
 
 Each body part is an item display holding the driver's player head, the only
 item Minecraft draws with a player's skin. The pack's entity core shader
