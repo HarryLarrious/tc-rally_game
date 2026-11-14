@@ -593,10 +593,15 @@ function menuRepaint {
     }
 }
 
+/** The roadbook: right click with it in hand to open the menu. */
+function roadbookItem(): item {
+    return item("paper").setName(s"<#FFC20E><b>Roadbook</b></#FFC20E> <gray>(right click)");
+}
+
 /** The roadbook in hotbar slot 1: right click it to open the menu. Holding
  * an item also makes right clicks reach the plot (the manual gearbox). */
 function giveRoadbook {
-    line book = item("paper").setName(s"<#FFC20E><b>Roadbook</b></#FFC20E> <gray>(right click)");
+    line book = roadbookItem();
     // Driving: the same book, drawn as nothing (the driver model holds the wheel).
     if (carOf(default.uuid) != 0) {
         line book = driverHandItem();
@@ -618,7 +623,7 @@ playerevent rightClick {
         menuClose();
     } else if (carOf(default.uuid) != 0) {
         shiftGear(-1);
-    } else {
+    } else if (default.isHoldingItem(roadbookItem(), hand="Main hand")) {
         menuOpen();
     }
 }
