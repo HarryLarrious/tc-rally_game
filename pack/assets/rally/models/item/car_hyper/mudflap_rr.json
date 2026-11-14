@@ -1,0 +1,82 @@
+{
+ "textures": {
+  "accent": "rally:item/car/accent",
+  "particle": "rally:item/car/accent"
+ },
+ "elements": [
+  {
+   "from": [
+    0.8,
+    10.4,
+    -6.56
+   ],
+   "to": [
+    1.12,
+    12.4,
+    -5.6
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    }
+   }
+  }
+ ]
+}

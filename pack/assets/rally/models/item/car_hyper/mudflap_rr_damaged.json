@@ -1,0 +1,92 @@
+{
+ "textures": {
+  "accent_dmg": "rally:item/car/accent_dmg",
+  "particle": "rally:item/car/accent_dmg"
+ },
+ "elements": [
+  {
+   "from": [
+    0.7385,
+    10.4538,
+    -6.5406
+   ],
+   "to": [
+    1.0585,
+    12.4538,
+    -5.5806
+   ],
+   "rotation": {
+    "origin": [
+     0.8985,
+     11.4538,
+     -6.0606
+    ],
+    "x": -3.873,
+    "y": -0.378,
+    "z": -0.946
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent_dmg",
+     "tintindex": 1
+    }
+   }
+  }
+ ]
+}

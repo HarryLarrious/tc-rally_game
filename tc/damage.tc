@@ -72,8 +72,25 @@ function loadPartStats {
     global sLocal = [];
     global sShield = [];
     global sRest = [];
-    for (line row of carPartData()) {
-        global sModel.append(((line row as str).split(" "))[2] as str);
+    // Item models and hitboxes per car model, model after model: part i of
+    // car model m is at (m - 1) * gParts + i (partKey).
+    repeat (line m to carModelCount()) {
+        for (line it of carPartItems(line m)) {
+            global sModel.append(line it as str);
+        }
+        for (line row of carPartBoxes(line m)) {
+            line b = (line row as str).split(" ");
+            global sC.append(vec(num.parse(line b[1] as str), num.parse(line b[2] as str), num.parse(line b[3] as str)));
+            global sH.append(vec(num.parse(line b[4] as str), num.parse(line b[5] as str), num.parse(line b[6] as str)));
+            global sLocal.append(vec(num.parse(line b[7] as str), num.parse(line b[8] as str), num.parse(line b[9] as str)));
+            line sh = [];
+            if (line b[10] as str != "-") {
+                for (line s of (line b[10] as str).split(",")) {
+                    line sh.append(num.parse(line s as str));
+                }
+            }
+            global sShield.append(line sh);
+        }
     }
     for (line row of carPartStats()) {
         line f = (line row as str).split(" ");
@@ -93,16 +110,6 @@ function loadPartStats {
         }
         global sParent.append(line n[3] as num);
         global sDmgModel.append(line n[4] as num);
-        global sC.append(vec(line n[5] as num, line n[6] as num, line n[7] as num));
-        global sH.append(vec(line n[8] as num, line n[9] as num, line n[10] as num));
-        global sLocal.append(vec(line n[11] as num, line n[12] as num, line n[13] as num));
-        line sh = [];
-        if (line f[14] as str != "-") {
-            for (line t of (line f[14] as str).split(",")) {
-                line sh.append(num.parse(line t as str));
-            }
-        }
-        global sShield.append(line sh);
         line rest = [];
         if (line f[15] as str != "-") {
             for (line t of (line f[15] as str).split(",")) {
@@ -240,15 +247,21 @@ function partEntity(c: num, i: num): str {
 }
 
 /** World location of part i's hitbox center on car c. */
+/** Index of part i of car c in the per-model lists (sModel, sC, sH,
+ * sLocal). */
+function partKey(c: num, i: num): num {
+    return (global cModel[c] - 1) * global gParts + i;
+}
+
 function partWorld(c: num, i: num): loc {
-    line p = global sC[i] - carCom();
+    line p = global sC[partKey(c, i)] - carCom();
     line w = global cPos[c] + global cL[c] * line p.x + global cU[c] * line p.y + global cF[c] * line p.z;
     return loc(line w.x, line w.y, line w.z);
 }
 
 /** Swaps part i of car c to its damaged model. */
 function showDamaged(c: num, i: num) {
-    line look = item("stone").setModel(global sModel[i]).setModelDataNumbers(global cPaint[c], global cAccent[c], type="Colors").setModelDataStrings("damaged");
+    line look = item("stone").setModel(global sModel[partKey(c, i)]).setModelDataNumbers(global cPaint[c], global cAccent[c], type="Colors").setModelDataStrings("damaged");
     select entitiesByName(partEntity(c, i));
     selectedEntity.setItemDisplayItem(line look);
     select reset;
@@ -264,8 +277,8 @@ function impactDamage(c: num, at: vec, speed: num) {
     line dmg = line e * line e * 4 + line e * 12;
     line near = [];
     repeat (line i to global gParts) {
-        line d = at - global sC[line i];
-        line h = global sH[line i];
+        line d = at - global sC[partKey(c, line i)];
+        line h = global sH[partKey(c, line i)];
         if (num.abs(line d.x) <= line h.x + 0.35 && num.abs(line d.y) <= line h.y + 0.35 && num.abs(line d.z) <= line h.z + 0.35) {
             if (global pOff[(c - 1) * global gParts + line i] == 0) {
                 line near.append(line i);
@@ -275,7 +288,7 @@ function impactDamage(c: num, at: vec, speed: num) {
     for (line v of line near) {
         line i = line v as num;
         line covered = 0;
-        for (line s of global sShield[line i] as list) {
+        for (line s of global sShield[partKey(c, line i)] as list) {
             if (line near.contains(line s)) {
                 line covered = 1;
             }
@@ -307,7 +320,7 @@ function detachPart(c: num, i: num) {
     line L = global cL[c];
     line U = global cU[c];
     line F = global cF[c];
-    line center = global sC[i];
+    line center = global sC[partKey(c, i)];
     line ids = [];
     line mats = [];
     for (line v of line group) {
@@ -464,7 +477,7 @@ function fixCar(c: num) {
     removeDisplays(global cAll[c] as list);
     line com = carCom();
     line o = global cPos[c] - (global cL[c] * line com.x + global cU[c] * line com.y + global cF[c] * line com.z);
-    line sets = spawnDisplays(loc(line o.x, line o.y, line o.z), global cPaint[c], global cAccent[c], "");
+    line sets = spawnDisplays(loc(line o.x, line o.y, line o.z), global cPaint[c], global cAccent[c], "", global cModel[c]);
     global cAll[c] = line sets[1];
     global cRigid[c] = line sets[2];
     global cMove[c] = line sets[3];

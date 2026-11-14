@@ -1,0 +1,205 @@
+{
+ "textures": {
+  "grille": "rally:item/car/grille",
+  "paint": "rally:item/car/paint",
+  "plastic": "rally:item/car/plastic",
+  "particle": "rally:item/car/grille"
+ },
+ "elements": [
+  {
+   "from": [
+    4.64,
+    14.52,
+    15.7531
+   ],
+   "to": [
+    11.36,
+    14.76,
+    22.4869
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     14.64,
+     19.12
+    ],
+    "x": 13.046,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    }
+   }
+  },
+  {
+   "from": [
+    6.96,
+    14.732,
+    16.4665
+   ],
+   "to": [
+    9.04,
+    14.852,
+    21.8535
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     14.792,
+     19.16
+    ],
+    "x": 13.046,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    }
+   }
+  },
+  {
+   "from": [
+    7.2,
+    14.8,
+    18.1586
+   ],
+   "to": [
+    8.8,
+    14.928,
+    19.5054
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     14.864,
+     18.832
+    ],
+    "x": 13.046,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  }
+ ]
+}

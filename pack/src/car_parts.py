@@ -9,6 +9,8 @@ Writes:
   pack/assets/rally/textures/item/car/<mat>.png    material textures
   car/parts.json                                   the part spec the game code reads
   tools/viewer/car_data.js                         the same data for the 3D viewer
+  pack/assets/rally/{models/item,items}/car_hyper/ the hypercar body (car_hyper.py)
+  car/parts_hyper.json, tools/viewer/car_data_hyper.js  its spec and viewer data
 
 This file is the single source of truth for the car. Geometry is written in
 car-frame meters (1 m = 1 block):
@@ -30,6 +32,7 @@ Needs Pillow.
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import random
@@ -75,6 +78,8 @@ MATERIALS: dict[str, dict] = {
     "headlight": {"emit": 15},
     "foglight":  {"emit": 15},
     "taillight": {"emit": 10},
+    "carbon":    {},
+    "led":       {"emit": 15},
 }
 
 
@@ -180,6 +185,14 @@ def make_textures() -> dict[str, Image.Image]:
     t["headlight"] = lens((250, 246, 225), (200, 200, 200))
     t["foglight"] = lens((255, 220, 90), (60, 60, 60))
     t["taillight"] = _flat((210, 25, 25), noise=6, seed=24)
+    carbon = Image.new("RGBA", (16, 16), (26, 27, 30, 255))
+    d = ImageDraw.Draw(carbon)
+    for y in range(0, 16, 2):  # woven twill
+        for x in range(0, 16, 4):
+            off = (y // 2) % 4
+            d.rectangle(((x + off) % 16, y, (x + off) % 16 + 1, y), fill=(52, 54, 60, 255))
+    t["carbon"] = carbon
+    t["led"] = _flat((236, 244, 255), noise=2, seed=25)
     return t
 
 
@@ -955,7 +968,27 @@ def tc_num(v: float) -> str:
     return f"{v:g}"
 
 
-def write_tc_data(spec: dict) -> None:
+def part_boxes(spec: dict) -> list[str]:
+    """Per part: hitbox center and half size in the car frame at rest, the
+    hitbox center in the part's own frame, and the part indices shielding it,
+    "cx cy cz hx hy hz lx ly lz shields" (shields "-" for none)."""
+    idx = {p["id"]: n + 1 for n, p in enumerate(spec["parts"])}
+    out = []
+    for p in spec["parts"]:
+        m = rest_matrix(p["pivot"], p["rest"])
+        lo, hi = p["hitbox"]
+        corners = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+        world = [tuple(sum(m[r * 4 + k] * c[k] for k in range(3)) + m[r * 4 + 3] for r in range(3)) for c in corners]
+        wlo = [min(w[i] for w in world) for i in range(3)]
+        whi = [max(w[i] for w in world) for i in range(3)]
+        vals = [(a + b) / 2 for a, b in zip(wlo, whi)] + [(b - a) / 2 for a, b in zip(wlo, whi)] \
+            + [(a + b) / 2 for a, b in zip(lo, hi)]
+        shield = ",".join(str(idx[x]) for x in p["shield"]) or "-"
+        out.append(" ".join(tc_num(v) for v in vals) + " " + shield)
+    return out
+
+
+def write_tc_data(spec: dict, looks: list[dict]) -> None:
     """tc/car_data.tc: the part list and the suspension geometry for the game code."""
     kinds = {"wheel": "wheel", "upright": "upright", "arm": "arm", "spring": "spring", "halfshaft": "halfshaft",
              "steering_wheel": "steer"}
@@ -1004,6 +1037,23 @@ def write_tc_data(spec: dict) -> None:
                   1 if p["damaged_model"] else 0, *center, *half, *local]
         stats.append('        "' + " ".join(tc_num(f) if isinstance(f, float) else str(f) for f in fields)
                      + f' {shield} {rest}"')
+    # Per car model (1 rally hatchback, 2 hypercar): item models and hitboxes.
+    items_fn = "function carPartItems(m: num): list {\n"
+    boxes_fn = "function carPartBoxes(m: num): list {\n"
+    for n, look in enumerate(looks, start=1):
+        items = ",\n".join(f'            "{p["item_model"]}"' for p in look["parts"])
+        boxes = ",\n".join(f'            "{b}"' for b in part_boxes(look))
+        for name, body in (("items", items), ("boxes", boxes)):
+            if n < len(looks):
+                code = f"    if (m == {n}) {{\n        return [\n" + body + "\n        ];\n    }\n"
+            else:
+                code = "    return [\n" + body.replace("\n            ", "\n        ").replace("            \"", "        \"", 1) + "\n    ];\n"
+            if name == "items":
+                items_fn += code
+            else:
+                boxes_fn += code
+    items_fn += "}\n"
+    boxes_fn += "}\n"
     gl = "\n".join(f"    global {k} = {tc_num(v)};" for k, v in geom.items())
     decl = "\n".join(f"declare global {k}: num;" for k in geom)
     text = (
@@ -1023,17 +1073,23 @@ def write_tc_data(spec: dict) -> None:
         " * rest matrix, first 12 numbers row-major (- = rigid, identity). */\n"
         "function carPartStats(): list {\n    return [\n" + ",\n".join(stats) + "\n    ];\n}\n\n"
         "/** Suspension and drawing geometry (car frame, meters) and the total mass. */\n"
-        + decl + "\n\n/** Sets the geometry globals. */\nfunction loadCarGeom {\n" + gl + "\n}\n"
+        + decl + "\n\n/** Sets the geometry globals. */\nfunction loadCarGeom {\n" + gl + "\n}\n\n"
+        f"/** Number of car models. */\nfunction carModelCount(): num {{\n    return {len(looks)};\n}}\n\n"
+        "/** Item model of each part (carPartData order) for car model m: 1 rally\n"
+        " * hatchback, 2 hypercar (its body panels have their own models). */\n" + items_fn + "\n"
+        "/** Hitbox and shields per part for car model m: \"cx cy cz hx hy hz lx ly lz\n"
+        " * shields\" (center and half size in the car frame at rest, center in the\n"
+        " * part's own frame, part indices that take hits first or -). */\n" + boxes_fn
     )
     (ROOT / "tc").mkdir(exist_ok=True)
     (ROOT / "tc/car_data.tc").write_text(text)
 
 
-def make_rigid() -> None:
+def make_rigid(parts: list[Part]) -> None:
     """Rebuild every part that never moves relative to the body around the car
     origin, so all of them share one display matrix (the car's) while driving.
     Their mount point stays in `attach`."""
-    by_id = {p.id: p for p in PARTS}
+    by_id = {p.id: p for p in parts}
 
     def fixed_chain(p: Part) -> bool:
         while p is not None:
@@ -1042,7 +1098,7 @@ def make_rigid() -> None:
             p = by_id.get(p.parent) if p.parent else None
         return True
 
-    for p in PARTS:
+    for p in parts:
         p.attach = p.pivot
         if p.model is None and fixed_chain(p):
             p.elems = to_local(p.elems, tuple(-c for c in p.pivot))
@@ -1054,74 +1110,70 @@ def corner_of(pid: str) -> int:
     return {"_fl": 1, "_fr": 2, "_rl": 3, "_rr": 4}.get(pid[-3:], 0)
 
 
-def main():
-    build_parts()
-    shared = shared_models()
-    for p in PARTS:
-        if p.elems is None:
-            p.elems = shared[p.model]
-    make_rigid()
+def variant_parts(base: list[Part], body: dict, shields: dict | None = None, labels: dict | None = None) -> list[Part]:
+    """A copy of the parts with the body panels in `body` (id -> (car-frame
+    elements, pivot or None)) swapped in, and the given shields and labels."""
+    out = copy.deepcopy(base)
+    for p in out:
+        if shields and p.id in shields:
+            p.shield = list(shields[p.id])
+        if labels and p.id in labels:
+            p.label = labels[p.id]
+        if p.id in body:
+            elems, pivot = body[p.id]
+            if pivot is None:
+                pivot = center_of(elems)
+            p.pivot = tuple(round(c, 3) for c in pivot)
+            p.elems = to_local(elems, p.pivot)
+    return out
 
+
+def write_variant(folder: str, parts: list[Part], own: set[str] | None, tex_b64: dict) -> dict:
+    """Writes one car look: its models and items under `folder` (only the
+    parts in `own` when set; the others use the rally car's), and returns
+    its spec. Fills the viewer data."""
     models: dict[str, tuple[list[Elem], bool]] = {}
-    for p in PARTS:
+    for p in parts:
         name = p.model or p.id
-        if name not in models:
+        if (own is None or p.id in own) and name not in models:
             models[name] = (p.elems, p.damaged)
-
-    mdir = ASSETS / "models/item/car"
-    idir = ASSETS / "items/car"
-    tdir = ASSETS / "textures/item/car"
-    for d in (mdir, idir, tdir):
+    mdir = ASSETS / f"models/item/{folder}"
+    idir = ASSETS / f"items/{folder}"
+    for d in (mdir, idir):
         d.mkdir(parents=True, exist_ok=True)
         for old in d.glob("*"):
             old.unlink()
-
-    used_tex: set[str] = set()
     model_data = {}
     for i, (name, (elems, dmg)) in enumerate(sorted(models.items())):
         m = model_json(elems, False, 0)
         (mdir / f"{name}.json").write_text(json.dumps(m, indent=1) + "\n")
-        used_tex |= set(m["textures"].values())
         model_data[name] = m
         if dmg:
             md = model_json(elems, True, 1000 + i)
             (mdir / f"{name}_damaged.json").write_text(json.dumps(md, indent=1) + "\n")
-            used_tex |= set(md["textures"].values())
             model_data[name + "_damaged"] = md
-        (idir / f"{name}.json").write_text(json.dumps(item_json(name, dmg), indent=1) + "\n")
+        item = item_json(name, dmg)
+        if folder != "car":
+            item = json.loads(json.dumps(item).replace(f'"{NS}:item/car/', f'"{NS}:item/{folder}/'))
+        (idir / f"{name}.json").write_text(json.dumps(item, indent=1) + "\n")
 
-    textures = make_textures()
-    tex_b64 = {}
-    import base64
-    import io
-    for name, img in textures.items():
-        if f"{NS}:item/car/{name}" not in used_tex:
-            continue
-        img.save(tdir / f"{name}.png", optimize=True)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        tex_b64[name] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    missing = {t.split("/")[-1] for t in used_tex} - set(tex_b64)
-    if missing:
-        raise SystemExit(f"textures missing: {missing}")
-
-    ids = {p.id for p in PARTS}
+    ids = {p.id for p in parts}
     spec_parts = []
-    for p in PARTS:
+    for p in parts:
         if p.parent and p.parent not in ids:
             raise SystemExit(f"{p.id}: unknown parent {p.parent}")
         for s in p.shield:
             if s not in ids:
                 raise SystemExit(f"{p.id}: unknown shield {s}")
+        mine = own is None or p.id in own
         spec_parts.append({
             "id": p.id, "label": p.label, "group": p.group, "parent": p.parent,
-            "model": p.model or p.id, "item_model": f"{NS}:car/{p.model or p.id}",
+            "model": p.model or p.id, "item_model": f"{NS}:{folder if mine else 'car'}/{p.model or p.id}",
             "pivot": [round(c, 4) for c in p.pivot], "rest": list(p.rest), "anim": p.anim,
             "rigid": p.rigid, "attach": [round(c, 4) for c in p.attach],
             "mass": p.mass, "hp": p.hp, "on_break": p.on_break, "effect": p.effect,
             "shield": p.shield, "damaged_model": p.damaged, "hitbox": hitbox(p.elems), "links": p.links,
         })
-
     spec = {
         "frame": "+X left, +Y up, +Z forward; meters; origin on the ground between the axles",
         "model_scale": MODEL_SCALE,
@@ -1132,23 +1184,86 @@ def main():
         "damage_state": "custom_model_data string 0 = \"damaged\" swaps to the _damaged model",
         "dimensions": {"wheelbase": WHEELBASE, "track": 2 * TRACK_X, "wheel_radius": WHEEL_R,
                        "wheel_width": WHEEL_W, "length": 4.17, "width": 1.86, "height": 1.45},
-        "total_mass": round(sum(p.mass for p in PARTS), 1),
+        "total_mass": round(sum(p.mass for p in parts), 1),
         "parts": spec_parts,
     }
-    (ROOT / "car").mkdir(exist_ok=True)
-    (ROOT / "car/parts.json").write_text(json.dumps(spec, indent=1) + "\n")
-
-    write_parts_table(spec)
-    write_tc_data(spec)
-
+    # The viewer shows every model of this look, the shared ones included.
+    all_models = {}
+    for i, p in enumerate(parts):
+        name = p.model or p.id
+        if name not in all_models:
+            all_models[name] = model_json(p.elems, False, 0)
+            if p.damaged:
+                all_models[name + "_damaged"] = model_json(p.elems, True, 1000 + i)
+    all_models.update(model_data)
+    suffix = "" if folder == "car" else "_" + folder.split("_", 1)[1]
     viewer = ROOT / "tools/viewer"
     viewer.mkdir(parents=True, exist_ok=True)
-    (viewer / "car_data.js").write_text(
+    (viewer / f"car_data{suffix}.js").write_text(
         "// Generated by pack/src/car_parts.py. Do not edit.\nwindow.CAR = "
-        + json.dumps({"spec": spec, "models": model_data, "textures": tex_b64}) + ";\n")
+        + json.dumps({"spec": spec, "models": all_models, "textures": tex_b64}) + ";\n")
+    return spec
 
-    print(f"{len(PARTS)} parts, {len(models)} models, {len(tex_b64)} textures, "
-          f"total mass {spec['total_mass']} kg")
+
+def main():
+    from car_hyper import LABELS, MODELS, SHIELDS, hyper_body
+
+    build_parts()
+    hyper_src = hyper_body()
+    shared = shared_models()
+    hyper = variant_parts(PARTS, hyper_src, SHIELDS, LABELS)
+    hyper_own = set(hyper_src)
+    for p in hyper:
+        if p.model in MODELS:
+            p.elems = MODELS[p.model]
+            hyper_own.add(p.id)
+    looks = [("car", list(PARTS), None), ("car_hyper", hyper, hyper_own)]
+    for _, parts, _ in looks:
+        for p in parts:
+            if p.elems is None:
+                p.elems = shared[p.model]
+        make_rigid(parts)
+
+    # Textures: every material any look uses.
+    tdir = ASSETS / "textures/item/car"
+    tdir.mkdir(parents=True, exist_ok=True)
+    for old in tdir.glob("*"):
+        old.unlink()
+    used = set()
+    for _, parts, _ in looks:
+        for p in parts:
+            for e in p.elems:
+                used.add(e.mat)
+                used.add(MATERIALS[e.mat].get("dmg", e.mat))
+    textures = make_textures()
+    tex_b64 = {}
+    import base64
+    import io
+    for name, img in textures.items():
+        if name not in used:
+            continue
+        img.save(tdir / f"{name}.png", optimize=True)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        tex_b64[name] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    missing = used - set(tex_b64)
+    if missing:
+        raise SystemExit(f"textures missing: {missing}")
+
+    specs = [write_variant(folder, parts, own, tex_b64) for folder, parts, own in looks]
+    # The game shares everything but the models and hitboxes between looks.
+    for a, b in zip(specs[0]["parts"], specs[1]["parts"]):
+        for key in ("id", "parent", "hp", "on_break", "rigid", "rest", "anim", "model"):
+            if a[key] != b[key]:
+                raise SystemExit(f"hypercar part {a['id']} differs in {key}")
+    (ROOT / "car").mkdir(exist_ok=True)
+    (ROOT / "car/parts.json").write_text(json.dumps(specs[0], indent=1) + "\n")
+    (ROOT / "car/parts_hyper.json").write_text(json.dumps(specs[1], indent=1) + "\n")
+    write_parts_table(specs[0])
+    write_tc_data(specs[0], specs)
+
+    print(f"{len(PARTS)} parts, {len(looks)} looks, {len(tex_b64)} textures, "
+          f"total mass {specs[0]['total_mass']} kg")
 
 
 if __name__ == "__main__":

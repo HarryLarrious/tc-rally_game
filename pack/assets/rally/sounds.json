@@ -1,4 +1,12 @@
 {
+ "engine.bov": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/bov"
+   }
+  ]
+ },
  "engine.hi": {
   "sounds": [
    {
@@ -28,6 +36,46 @@
    {
     "attenuation_distance": 40,
     "name": "rally:engine/pop"
+   }
+  ]
+ },
+ "engine.turbo": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/turbo"
+   }
+  ]
+ },
+ "engine.v8_hi": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/v8_hi"
+   }
+  ]
+ },
+ "engine.v8_lo": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/v8_lo"
+   }
+  ]
+ },
+ "engine.v8_mid": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/v8_mid"
+   }
+  ]
+ },
+ "engine.v8_pop": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/v8_pop"
    }
   ]
  }

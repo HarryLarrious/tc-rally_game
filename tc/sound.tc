@@ -1,5 +1,5 @@
 // Engine sound (pack/src/engine_sound.py): one short clip of whole
-// inline-4 firing cycles, played every tick at the engine and pitched to the
+// firing cycles (inline-4, or the hypercar's V8), played every tick at the engine and pitched to the
 // exact rpm. Consecutive clips overlap, so the pitch follows the rpm in small
 // steps. The cycle is baked at three base speeds so no clip is pitched more
 // than about +-45% (pitching further drags the exhaust tone up and sounds
@@ -8,10 +8,18 @@
 // throttle the engine is quieter and pops now and then above 3500 rpm.
 
 /** Plays car c's engine for this tick. A dead engine is silent; with the
- * exhaust torn off it is louder. */
+ * exhaust torn off it is louder. The hypercar plays the V8 clips, its turbo
+ * whistle (pitched and turned up with the boost) and the blow-off valve
+ * when the boost is dumped; its overrun pops are deeper and spit flames
+ * from the twin tail pipes. */
 function engineSound(c: num) {
     if (global cPower[c] <= 0) {
         return;
+    }
+    line v8 = global cModel[c] == 2;
+    line pre = "";
+    if (line v8) {
+        line pre = "v8_";
     }
     line rpm = global cRpm[c];
     line at = partWorld(c, global iEngine);
@@ -19,24 +27,46 @@ function engineSound(c: num) {
     if (global cThr[c] == 0) {
         line gain = 0.45;
         if (line rpm > 3500 && num.randomd(0, 1) < 0.08) {
-            allPlayers.playSound(csnd("rally:engine.pop", num.randomd(0.85, 1.15), 0.8), line at);
+            allPlayers.playSound(csnd("rally:engine.%var(pre)pop", num.randomd(0.85, 1.15), 0.8), line at);
+            if (line v8) {
+                for (line s of [1, -1]) {
+                    allPlayers.displayParticleEffect(par("Flame"), carPoint(c, vec(0.22 * (line s as num), 0.34, -2.12)));
+                }
+            }
         }
     }
     if (partHealth(c, global iExhaust) <= 0) {
         line gain = line gain * 1.5;
     }
+    if (line v8) {
+        line boost = global cBoost[c];
+        if (line boost > 0.05) {
+            allPlayers.playSound(csnd("rally:engine.turbo", 0.85 + line boost * 0.4, line boost * 0.07), line at);
+        }
+        if (global cBov[c] == 1) {
+            global cBov[c] = 0;
+            allPlayers.playSound(csnd("rally:engine.bov", num.randomd(0.95, 1.08), 0.45), line at);
+        }
+    }
     // Crossfade lo -> mid around 1900 rpm and mid -> hi around 4100 rpm.
     line up1 = num.clamp((line rpm - 1700) / 400, 0, 1);
     line up2 = num.clamp((line rpm - 3900) / 400, 0, 1);
     if (line up1 < 1) {
-        engineClip("lo", 1300, 2, line rpm, line at, line gain * (1 - line up1));
+        engineClip("%var(pre)lo", 1300, 2, line rpm, line at, line gain * (1 - line up1));
     }
     if (line up1 > 0 && line up2 < 1) {
-        engineClip("mid", 2900, 5, line rpm, line at, line gain * line up1 * (1 - line up2));
+        engineClip("%var(pre)mid", 2900, 5, line rpm, line at, line gain * line up1 * (1 - line up2));
     }
     if (line up2 > 0) {
-        engineClip("hi", 5800, 10, line rpm, line at, line gain * line up2);
+        engineClip("%var(pre)hi", 5800, 10, line rpm, line at, line gain * line up2);
     }
+}
+
+/** World location of point v (car frame) of car c. */
+function carPoint(c: num, v: vec): loc {
+    line p = v - carCom();
+    line w = global cPos[c] + global cL[c] * line p.x + global cU[c] * line p.y + global cF[c] * line p.z;
+    return loc(line w.x, line w.y, line w.z);
 }
 
 /** Plays engine clip `name` (baked at `base` rpm, `cycles` engine cycles

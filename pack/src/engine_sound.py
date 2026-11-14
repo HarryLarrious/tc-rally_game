@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Procedural engine sound for the rally car: a 2.0 turbo inline-4.
+"""Procedural engine sound: the rally car's 2.0 turbo inline-4 and the
+hypercar's 4.0 twin-turbo V8.
 
     python3 pack/src/engine_sound.py                       # built-in combustion pulse
     python3 pack/src/engine_sound.py --pulse bang.wav      # your own pulse
@@ -18,7 +19,16 @@ the same cycle is baked at three base speeds (crossfaded at 1900 and 4100 rpm):
   pack/assets/rally/sounds/engine/mid.ogg   2900 rpm base, 5 cycles   (1700..4300 rpm)
   pack/assets/rally/sounds/engine/hi.ogg    5800 rpm base, 10 cycles  (3900..8000 rpm)
   pack/assets/rally/sounds/engine/pop.ogg   one anti-lag bang for the overrun
-  pack/assets/rally/sounds.json             engine.lo, engine.hi, engine.pop
+  pack/assets/rally/sounds/engine/v8_*.ogg  the same three clips and pop for the V8
+  pack/assets/rally/sounds/engine/turbo.ogg the V8's turbo whistle (pitched with boost)
+  pack/assets/rally/sounds/engine/bov.ogg   its blow-off valve (boost dumped on a lift)
+  pack/assets/rally/sounds.json             engine.<clip> for each
+
+The V8 is a cross-plane engine: four firings per crank revolution (firing
+order 1-8-4-3-6-5-7-2), alternating unevenly between the banks (L R R L R L
+L R). Each bank has its own exhaust with its own pipe resonance, which gives
+the burble; the pulses are bigger and lower than the inline-4's. Its turbo
+whistle is a separate clip so it can follow the boost, not the rpm.
 
 How a cycle is built:
   - Combustion: one pulse per firing. An inline-4 fires twice per crank
@@ -53,6 +63,11 @@ TICK = 0.05                  # the game plays a clip every tick
 BASES = {"lo": (1300, 2), "mid": (2900, 5), "hi": (5800, 10)}
 CROSS = [1900, 4100]         # rpm where the game crossfades lo -> mid -> hi (+-200)
 CYL_LEVEL = [1.0, 0.92, 1.06, 0.96]   # firing order 1-3-4-2, slight imbalance
+# V8: firing order 1-8-4-3-6-5-7-2; banks (0 left, 1 right) of each firing,
+# per-cylinder level and a small timing wobble (fraction of the interval).
+V8_BANK = [0, 1, 1, 0, 1, 0, 0, 1]
+V8_LEVEL = [1.0, 0.95, 1.05, 0.93, 1.02, 0.97, 1.06, 0.94]
+V8_WOBBLE = [0.0, 0.035, -0.03, 0.0, 0.03, -0.035, 0.02, -0.02]
 
 
 def default_pulse() -> np.ndarray:
@@ -109,6 +124,92 @@ def resonance(x: np.ndarray, hz: float, q: float) -> np.ndarray:
     return signal.lfilter(b, a, x)
 
 
+def render_v8(rpm: float, on: bool, pulse: np.ndarray, seed: int, seconds: float = 1.0) -> np.ndarray:
+    """The twin-turbo V8: cross-plane firing into two banks, each with its
+    own exhaust resonance. No turbo whistle (that is its own clip)."""
+    rng = np.random.default_rng(seed)
+    n = int(seconds * SR)
+    pad = int(0.15 * SR)
+    banks = [np.zeros(n + 2 * pad), np.zeros(n + 2 * pad)]
+    period = SR / (rpm / 15.0)           # 8 cylinders, 4-stroke: 4 firings per rev
+    load = 1.0 if on else 0.3
+    big = stretch(pulse, 1.45)           # bigger cylinders: a lower, longer thump
+    pop = stretch(pulse, 2.0)
+    t = -pad * 0.5
+    k = 0
+    while t < n + pad:
+        i = k % 8
+        pos = int(pad + t + (V8_WOBBLE[i] + rng.normal(0, 0.004)) * period)
+        amp = load * V8_LEVEL[i] * (1 + rng.normal(0, 0.05))
+        out = banks[V8_BANK[i]]
+        if 0 <= pos < len(out):
+            seg = big[: len(out) - pos]
+            out[pos:pos + len(seg)] += amp * seg
+            if not on and rpm >= 3000 and rng.random() < 0.015 + rpm / 500000:
+                seg = pop[: len(out) - pos]
+                out[pos:pos + len(seg)] += rng.uniform(0.8, 1.4) * seg
+        t += period
+        k += 1
+    cut = (380 + rpm * 0.10) if on else (300 + rpm * 0.045)
+    left = lowpass(banks[0], cut)
+    right = lowpass(banks[1], cut)
+    ex = (left + 0.55 * resonance(left, 68, 3) + 0.2 * resonance(left, 190, 5)
+          + right + 0.55 * resonance(right, 84, 3) + 0.2 * resonance(right, 230, 5))
+    time = np.arange(len(ex)) / SR
+    crank = rpm / 60.0
+    mech = 0.03 * np.sin(2 * np.pi * crank * 4 * time) + 0.015 * np.sin(2 * np.pi * crank * 8 * time)
+    tick = lowpass(rng.standard_normal(len(ex)), 2500) * 0.003 * (0.5 + rpm / 8000)
+    mix = signal.lfilter(*signal.butter(2, 25 / (SR / 2), btype="high"), ex + mech + tick)
+    return mix[pad:pad + n]
+
+
+def sweep_bandpass(x: np.ndarray, fc: np.ndarray, q: float) -> np.ndarray:
+    """Band-pass with a center that moves sample by sample (a state-variable
+    filter), so a sweep stays smooth instead of stepping."""
+    out = np.zeros_like(x)
+    low = band = 0.0
+    damp = 1.0 / q
+    for n in range(len(x)):
+        f = 2 * np.sin(np.pi * min(fc[n], SR * 0.2) / SR)
+        high = x[n] - low - damp * band
+        band += f * high
+        low += f * band
+        out[n] = band
+    return out
+
+
+def turbo_sound() -> np.ndarray:
+    """The turbo, 0.4 s: soft rushing air (noise around 1.4 kHz, the top
+    rolled off) with only a faint whistle, windowed so the copies played
+    every tick blend into a steady rush (the game pitches it with the
+    boost)."""
+    rng = np.random.default_rng(31)
+    n = int(0.4 * SR)
+    time = np.arange(n) / SR
+    air = signal.lfilter(*signal.butter(2, [800 / (SR / 2), 2200 / (SR / 2)], btype="band"), rng.standard_normal(n))
+    air = lowpass(air, 2600)
+    f = 1700 * (1 + 0.01 * np.sin(2 * np.pi * 23 * time))
+    whistle = np.sin(2 * np.pi * np.cumsum(f) / SR)
+    x = (air / np.max(np.abs(air)) + 0.1 * whistle) * np.hanning(n)
+    return x / np.max(np.abs(x))
+
+
+def bov_sound() -> np.ndarray:
+    """Blow-off valve, 0.5 s: a burst of air whose pitch falls smoothly from
+    2.8 kHz to 600 Hz, with a soft compressor flutter in its tail."""
+    rng = np.random.default_rng(32)
+    n = int(0.5 * SR)
+    time = np.arange(n) / SR
+    noise = rng.standard_normal(n)
+    fc = 600 + 2200 * np.exp(-time / 0.12)
+    x = sweep_bandpass(noise, fc, 1.4)
+    x = x + 0.25 * lowpass(noise, 900)
+    env = np.minimum(1, time / 0.008) * np.exp(-time / 0.17)
+    flutter = 1 - 0.3 * np.clip((time - 0.12) / 0.05, 0, 1) * (0.5 + 0.5 * np.sin(2 * np.pi * 22 * time))
+    x = lowpass(x * env * flutter, 5000)
+    return x / np.max(np.abs(x))
+
+
 def render(rpm: float, on: bool, pulse: np.ndarray, seed: int, seconds: float = 1.0) -> np.ndarray:
     rng = np.random.default_rng(seed)
     n = int(seconds * SR)
@@ -162,15 +263,15 @@ def write_wav(path: Path, x: np.ndarray) -> None:
         w.writeframes(data.tobytes())
 
 
-def to_ogg(wav: Path, ogg: Path) -> None:
+def to_ogg(wav: Path, ogg: Path, quality: int = 3) -> None:
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav), "-ac", "1", "-c:a", "libvorbis",
-                    "-q:a", "3", str(ogg)], check=True)
+                    "-q:a", str(quality), str(ogg)], check=True)
 
 
-def grain(pulse: np.ndarray, rpm: int, cycles: int, seed: int) -> np.ndarray:
-    """`cycles` whole engine cycles (4 firings each) at `rpm`, cut from a
-    steady stretch and Hann-windowed so overlapping copies blend."""
-    x = render(rpm, True, pulse, seed, seconds=1.0)
+def grain(pulse: np.ndarray, rpm: int, cycles: int, seed: int, v8: bool = False) -> np.ndarray:
+    """`cycles` whole engine cycles (two crank revolutions each) at `rpm`, cut
+    from a steady stretch and Hann-windowed so overlapping copies blend."""
+    x = render_v8(rpm, True, pulse, seed, seconds=1.0) if v8 else render(rpm, True, pulse, seed, seconds=1.0)
     cycle = int(round(SR * 120.0 / rpm))           # 2 crank revolutions
     start = int(0.4 * SR)
     g = x[start:start + cycles * cycle]
@@ -236,6 +337,13 @@ def main() -> None:
     for name in sounds:
         sounds[name] = sounds[name] * 0.85 / np.max(np.abs(sounds[name]))
     sounds["pop"] = pop_sound(pulse) * 0.9
+    for name, (base, cycles) in BASES.items():
+        x = grain(pulse, base, cycles, seed=base + 1, v8=True)
+        sounds[f"v8_{name}"] = x * 0.85 / np.max(np.abs(x))
+    v8pop = pop_sound(stretch(pulse, 1.3))
+    sounds["v8_pop"] = lowpass(v8pop, 1400) / np.max(np.abs(lowpass(v8pop, 1400))) * 0.95
+    sounds["turbo"] = turbo_sound() * 0.8
+    sounds["bov"] = bov_sound() * 0.85
 
     out = ASSETS / "sounds/engine"
     out.mkdir(parents=True, exist_ok=True)
@@ -245,7 +353,8 @@ def main() -> None:
         for name, x in sounds.items():
             wav = Path(tmp) / f"{name}.wav"
             write_wav(wav, x)
-            to_ogg(wav, out / f"{name}.ogg")
+            # Noise squashes badly at low Vorbis quality: the air sounds get more bits.
+            to_ogg(wav, out / f"{name}.ogg", 7 if name in ("turbo", "bov") else 3)
 
     sounds_path = ASSETS / "sounds.json"
     table = json.loads(sounds_path.read_text()) if sounds_path.exists() else {}

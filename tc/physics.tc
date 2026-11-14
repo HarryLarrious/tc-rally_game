@@ -112,6 +112,22 @@ function gearManual(uuid: str): num {
     return 0;
 }
 
+/** Engine torque (N m) of car c at rpm. The hypercar's 4.0 twin-turbo V8:
+ * 520 without boost, best at 4500 rpm; the turbos add up to 330 as the
+ * boost builds (cBoost, 0..1), from 2000 rpm and fully above 3500. */
+function engineTorqueOf(c: num, rpm: num): num {
+    if (global cModel[c] != 2) {
+        return engineTorque(rpm);
+    }
+    if (rpm > 7800) {
+        return 0;
+    }
+    line dev = (rpm - 4500) / 3800;
+    line base = num.max(220, 520 * (1 - 0.4 * line dev * line dev));
+    line spool = num.clamp((rpm - 2000) / 1500, 0, 1);
+    return line base + 330 * global cBoost[c] * line spool;
+}
+
 /** Traction control per player uuid: 0 off, 1 or missing on. */
 declare saved tcMode: dict[num];
 
@@ -259,9 +275,24 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
         line gear = num.max(1, global cGearMax[c]);
         line ratio = gearRatio(line gear);
     }
+    // Hypercar turbos: boost builds under throttle above 2000 rpm (about a
+    // second to full from 3000 rpm), and a lift or a shift dumps it through
+    // the blow-off valve.
+    if (global cModel[c] == 2) {
+        line boost = global cBoost[c];
+        if (line throttle > 0 && line shift == 0 && line rpm > 2000) {
+            line boost = num.min(1, line boost + 0.02 + 0.03 * line rpm / 7000);
+        } else if (line boost > 0.5) {
+            global cBov[c] = 1;
+            line boost = line boost * 0.3;
+        } else {
+            line boost = num.max(0, line boost - 0.1);
+        }
+        global cBoost[c] = line boost;
+    }
     line drive = 0;
     if (line shift == 0 && global cGearMax[c] > 0) {
-        line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c] * line cut;
+        line drive = engineTorqueOf(c, line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c] * line cut;
     }
     // Limiter: above 7800 the fuel is cut (no torque this tick) and the revs
     // drop, so an engine revving on spinning tires bounces off it instead

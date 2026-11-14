@@ -1,0 +1,375 @@
+{
+ "textures": {
+  "alloy": "rally:item/car/alloy",
+  "darksteel": "rally:item/car/darksteel",
+  "particle": "rally:item/car/alloy"
+ },
+ "elements": [
+  {
+   "from": [
+    6.4,
+    10.72,
+    -1.76
+   ],
+   "to": [
+    9.6,
+    12.96,
+    -0.96
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    }
+   }
+  },
+  {
+   "from": [
+    6.72,
+    11.04,
+    -5.76
+   ],
+   "to": [
+    9.28,
+    12.64,
+    -1.76
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#alloy"
+    }
+   }
+  },
+  {
+   "from": [
+    7.8163,
+    11.3965,
+    -6.08
+   ],
+   "to": [
+    8.1837,
+    12.2835,
+    -5.76
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    }
+   }
+  },
+  {
+   "from": [
+    7.8163,
+    11.3965,
+    -6.08
+   ],
+   "to": [
+    8.1837,
+    12.2835,
+    -5.76
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     11.84,
+     -5.92
+    ],
+    "x": 0.0,
+    "y": 0.0,
+    "z": 45.0
+   },
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    }
+   }
+  },
+  {
+   "from": [
+    7.8163,
+    11.3965,
+    -6.08
+   ],
+   "to": [
+    8.1837,
+    12.2835,
+    -5.76
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     11.84,
+     -5.92
+    ],
+    "x": 0.0,
+    "y": 0.0,
+    "z": 90.0
+   },
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    }
+   }
+  },
+  {
+   "from": [
+    7.8163,
+    11.3965,
+    -6.08
+   ],
+   "to": [
+    8.1837,
+    12.2835,
+    -5.76
+   ],
+   "rotation": {
+    "origin": [
+     8.0,
+     11.84,
+     -5.92
+    ],
+    "x": 0.0,
+    "y": 0.0,
+    "z": 135.0
+   },
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    }
+   }
+  }
+ ]
+}

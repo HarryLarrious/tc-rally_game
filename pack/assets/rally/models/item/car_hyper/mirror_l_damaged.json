@@ -1,0 +1,205 @@
+{
+ "textures": {
+  "glass_dmg": "rally:item/car/glass_dmg",
+  "paint_dmg": "rally:item/car/paint_dmg",
+  "plastic_dmg": "rally:item/car/plastic_dmg",
+  "particle": "rally:item/car/glass_dmg"
+ },
+ "elements": [
+  {
+   "from": [
+    14.7974,
+    15.562,
+    12.9821
+   ],
+   "to": [
+    14.9574,
+    15.722,
+    14.1578
+   ],
+   "rotation": {
+    "origin": [
+     14.8774,
+     15.642,
+     13.5699
+    ],
+    "x": -28.057,
+    "y": 114.574,
+    "z": 4.344
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    }
+   }
+  },
+  {
+   "from": [
+    15.1629,
+    15.645,
+    12.6637
+   ],
+   "to": [
+    15.9629,
+    16.285,
+    13.7837
+   ],
+   "rotation": {
+    "origin": [
+     15.5629,
+     15.965,
+     13.2237
+    ],
+    "x": -0.985,
+    "y": -0.636,
+    "z": 1.628
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint_dmg",
+     "tintindex": 0
+    }
+   }
+  },
+  {
+   "from": [
+    15.2232,
+    15.6391,
+    12.583
+   ],
+   "to": [
+    15.9432,
+    16.1991,
+    12.623
+   ],
+   "rotation": {
+    "origin": [
+     15.5832,
+     15.9191,
+     12.603
+    ],
+    "x": -4.905,
+    "y": 4.067,
+    "z": -3.902
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  }
+ ]
+}

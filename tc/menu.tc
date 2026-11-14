@@ -148,7 +148,8 @@ function menuChosen(id: str): num {
     if ((id == "arms_classic" && line slim == 0) || (id == "arms_slim" && line slim == 1)) {
         return 1;
     }
-    if (id == "model_hatch") {
+    line model = carModelOf(default.uuid);
+    if ((id == "model_hatch" && line model == 1) || (id == "model_hyper" && line model == 2)) {
         return 1;
     }
     line tc = tcOn(default.uuid);
@@ -298,9 +299,10 @@ function menuGarage(st: dict): list {
         }
         line out.append({kind: "deco", ent: menuRect(st, 0 - line w / 2 + (line w / 14) * (line i - 0.5), 0.715, line w / 14, 0.09, line col, 100, 0.02)});
     }
-    // Model: one car for now; more get buttons here.
+    // Model.
     line out.append({kind: "deco", ent: menuText(st, -0.72, 0.5, "MODEL", "label", 0.45)});
-    line out.append(menuButton(st, "model_hatch", 0.42, 0.5, 1.2, 0.18, "RALLY HATCHBACK", 0.38, "model hatch"));
+    line out.append(menuButton(st, "model_hatch", 0.11, 0.5, 0.58, 0.18, "HATCHBACK", 0.34, "model hatch"));
+    line out.append(menuButton(st, "model_hyper", 0.73, 0.5, 0.58, 0.18, "HYPERCAR", 0.34, "model hyper"));
     // Colors.
     line hexes = carColorHexes();
     line out.append({kind: "deco", ent: menuText(st, -0.72, 0.27, "PRIMARY", "label", 0.45)});
@@ -485,8 +487,14 @@ function menuAction(action: str) {
         menuRepaint();
         return;
     }
-    if (action == "model hatch") {
+    if (action == "model hatch" || action == "model hyper") {
+        if (action == "model hyper") {
+            saved carModelSel[line uuid] = 2;
+        } else {
+            saved carModelSel[line uuid] = 1;
+        }
         default.playSound(snd("UI Button Click"));
+        menuRepaint();
         return;
     }
     if (action == "tc on" || action == "tc off") {

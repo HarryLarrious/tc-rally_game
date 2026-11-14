@@ -1,0 +1,92 @@
+{
+ "model": {
+  "type": "minecraft:select",
+  "property": "minecraft:custom_model_data",
+  "index": 0,
+  "cases": [
+   {
+    "when": "damaged",
+    "model": {
+     "type": "minecraft:model",
+     "model": "rally:item/car_hyper/windshield_damaged",
+     "transformation": {
+      "translation": [
+       1.5,
+       -0.5,
+       1.5
+      ],
+      "left_rotation": [
+       0,
+       1,
+       0,
+       0
+      ],
+      "scale": [
+       2.0,
+       2.0,
+       2.0
+      ],
+      "right_rotation": [
+       0,
+       0,
+       0,
+       1
+      ]
+     },
+     "tints": [
+      {
+       "type": "minecraft:custom_model_data",
+       "index": 0,
+       "default": 14211288
+      },
+      {
+       "type": "minecraft:custom_model_data",
+       "index": 1,
+       "default": 1989288
+      }
+     ]
+    }
+   }
+  ],
+  "fallback": {
+   "type": "minecraft:model",
+   "model": "rally:item/car_hyper/windshield",
+   "transformation": {
+    "translation": [
+     1.5,
+     -0.5,
+     1.5
+    ],
+    "left_rotation": [
+     0,
+     1,
+     0,
+     0
+    ],
+    "scale": [
+     2.0,
+     2.0,
+     2.0
+    ],
+    "right_rotation": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "tints": [
+    {
+     "type": "minecraft:custom_model_data",
+     "index": 0,
+     "default": 14211288
+    },
+    {
+     "type": "minecraft:custom_model_data",
+     "index": 1,
+     "default": 1989288
+    }
+   ]
+  }
+ }
+}

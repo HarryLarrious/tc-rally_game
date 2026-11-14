@@ -126,6 +126,15 @@ function carsTick {
     while (global cTc.len() < global carCount) {
         global cTc.append(1);
     }
+    while (global cModel.len() < global carCount) {
+        global cModel.append(1);
+    }
+    while (global cBoost.len() < global carCount) {
+        global cBoost.append(0);
+    }
+    while (global cBov.len() < global carCount) {
+        global cBov.append(0);
+    }
     repeat (line c to global carCount) {
         if (global cStatic[line c] != 0) {
             continue;
@@ -206,6 +215,11 @@ function carHud(c: num) {
     line tcs = "";
     if (global cTc[c] < 0.95) {
         line tcs = " TC";
+    }
+    // The hypercar's boost pressure (1.4 bar at full boost).
+    if (global cModel[c] == 2) {
+        line bar = num.round(global cBoost[c] * 14) / 10;
+        line tcs = "%var(tcs)  +%var(bar) bar";
     }
     // The builder is close behind: the road ahead is still being made.
     if (gnLeadOf(c) < 25) {

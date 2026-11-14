@@ -1,0 +1,407 @@
+{
+ "textures": {
+  "grille": "rally:item/car/grille",
+  "paint": "rally:item/car/paint",
+  "plastic": "rally:item/car/plastic",
+  "taillight": "rally:item/car/taillight",
+  "particle": "rally:item/car/grille"
+ },
+ "elements": [
+  {
+   "from": [
+    3.04,
+    15.84,
+    -8.0
+   ],
+   "to": [
+    12.96,
+    16.16,
+    0.4
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    15.2,
+    -8.32
+   ],
+   "to": [
+    11.2,
+    16.0,
+    -8.0
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#paint",
+     "tintindex": 0
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    12.4,
+    -8.24
+   ],
+   "to": [
+    11.2,
+    14.88,
+    -8.0
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic"
+    }
+   }
+  },
+  {
+   "from": [
+    4.96,
+    12.64,
+    -8.28
+   ],
+   "to": [
+    11.04,
+    14.72,
+    -8.24
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  },
+  {
+   "from": [
+    4.64,
+    14.88,
+    -8.4
+   ],
+   "to": [
+    11.36,
+    15.2,
+    -8.32
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#taillight"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#taillight"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#taillight"
+    }
+   },
+   "light_emission": 10
+  },
+  {
+   "from": [
+    4.8,
+    16.16,
+    -1.52
+   ],
+   "to": [
+    11.2,
+    16.24,
+    -0.88
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    16.16,
+    -2.64
+   ],
+   "to": [
+    11.2,
+    16.24,
+    -2.0
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    16.16,
+    -3.76
+   ],
+   "to": [
+    11.2,
+    16.24,
+    -3.12
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    16.16,
+    -4.88
+   ],
+   "to": [
+    11.2,
+    16.24,
+    -4.24
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  },
+  {
+   "from": [
+    4.8,
+    16.16,
+    -6.0
+   ],
+   "to": [
+    11.2,
+    16.24,
+    -5.36
+   ],
+   "faces": {
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#grille"
+    }
+   }
+  }
+ ]
+}

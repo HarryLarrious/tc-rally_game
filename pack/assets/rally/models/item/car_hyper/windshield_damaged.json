@@ -1,0 +1,320 @@
+{
+ "textures": {
+  "glass_dmg": "rally:item/car/glass_dmg",
+  "particle": "rally:item/car/glass_dmg"
+ },
+ "elements": [
+  {
+   "from": [
+    2.3265,
+    15.648,
+    14.458
+   ],
+   "to": [
+    13.8265,
+    15.808,
+    16.1387
+   ],
+   "rotation": {
+    "origin": [
+     8.0765,
+     15.728,
+     15.2984
+    ],
+    "x": -38.393,
+    "y": 184.065,
+    "z": 0.409
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  },
+  {
+   "from": [
+    2.8217,
+    16.5204,
+    12.971
+   ],
+   "to": [
+    13.3217,
+    16.6804,
+    14.6518
+   ],
+   "rotation": {
+    "origin": [
+     8.0717,
+     16.6004,
+     13.8114
+    ],
+    "x": -38.568,
+    "y": 180.974,
+    "z": 1.992
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  },
+  {
+   "from": [
+    3.265,
+    17.5012,
+    11.6904
+   ],
+   "to": [
+    12.765,
+    17.6612,
+    13.3712
+   ],
+   "rotation": {
+    "origin": [
+     8.015,
+     17.5812,
+     12.5308
+    ],
+    "x": -30.184,
+    "y": 175.51,
+    "z": 0.694
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  },
+  {
+   "from": [
+    3.6655,
+    18.4524,
+    10.1804
+   ],
+   "to": [
+    12.1655,
+    18.6124,
+    11.8611
+   ],
+   "rotation": {
+    "origin": [
+     7.9155,
+     18.5324,
+     11.0207
+    ],
+    "x": -34.965,
+    "y": 177.747,
+    "z": -0.192
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  }
+ ]
+}

@@ -43,8 +43,10 @@ declare global cHand: list[num];
  * cars keep their numbers). */
 declare global cAwake: list[num];
 declare global cStatic: list[num];
-/** UUID of the player who spawned each car ("" for none). */
+/** UUID of the player who spawned each car ("" for none), and its model
+ * (1 rally hatchback, 2 hypercar). */
 declare global cOwner: list[str];
+declare global cModel: list[num];
 /** Strongest impact speed (m/s) this tick, for sound and later damage. */
 declare global cImpact: list[num];
 /** Ticks left in which hits and bottoming out do no damage (after spawning,
@@ -54,6 +56,10 @@ declare global cGrace: list[num];
 declare global cThr: list[num];
 /** Traction control's power share this tick (1 = full power). */
 declare global cTc: list[num];
+/** Hypercar turbo boost (0..1), and 1 for a tick when it was dumped on a
+ * lift or shift (the blow-off valve sound). */
+declare global cBoost: list[num];
+declare global cBov: list[num];
 /** Per wheel, 4 per car (car c, corner i at (c - 1) * 4 + i): suspension
  * compression (m), roll angle (degrees), surface grip, and 1 when the tire
  * is sliding. */
@@ -91,6 +97,17 @@ function carColorHexes(): list {
 declare saved carPaintSel: dict[num];
 declare saved carAccentSel: dict[num];
 
+/** Per player UUID: the chosen car model (1 rally hatchback, 2 hypercar). */
+declare saved carModelSel: dict[num];
+
+/** The player's car model (the hatchback when not chosen). */
+function carModelOf(uuid: str): num {
+    if (saved carModelSel.hasKeys(uuid)) {
+        return saved carModelSel[uuid];
+    }
+    return 1;
+}
+
 /** The player's primary color index (white when not chosen). */
 function carPaintOf(uuid: str): num {
     if (saved carPaintSel.hasKeys(uuid)) {
@@ -118,7 +135,7 @@ function spawnCarFor(at: loc, only: str = ""): num {
         }
     }
     line cols = carColors();
-    return spawnCar(at, cols[carPaintOf(default.uuid)] as num, cols[carAccentOf(default.uuid)] as num, only);
+    return spawnCar(at, cols[carPaintOf(default.uuid)] as num, cols[carAccentOf(default.uuid)] as num, only, carModelOf(default.uuid));
 }
 
 /** Center of mass in the car frame. */
@@ -140,7 +157,7 @@ function moverIndex(kind: str, corner: num): num {
  * paint and accent colors. With `only` set to a part id, spawns just that
  * part and never simulates it (for checking models). Returns the car's
  * number. */
-function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
+function spawnCar(at: loc, paint: num, accent: num, only: str = "", model: num = 1): num {
     line yaw: num = at.getCoordinate(coord="Yaw");
     line origin = loc(at.x, at.y, at.z, 0, 0);
     line fwd = vec(0 - num.sin(line yaw), 0, num.cos(line yaw));
@@ -148,7 +165,7 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     line left = line up.cross(line fwd);
 
     global carCount += 1;
-    line sets = spawnDisplays(line origin, paint, accent, only);
+    line sets = spawnDisplays(line origin, paint, accent, only, model);
     global cAll.append(line sets[1]);
     global cRigid.append(line sets[2]);
     global cMove.append(line sets[3]);
@@ -176,10 +193,16 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     global cGrace.append(40);
     global cThr.append(0);
     global cTc.append(1);
-    // Cars spawned before owners were kept get none.
+    global cBoost.append(0);
+    global cBov.append(0);
+    // Cars spawned before owners and models were kept get none and model 1.
     while (global cOwner.len() < global carCount - 1) {
         global cOwner.append("");
     }
+    while (global cModel.len() < global carCount - 1) {
+        global cModel.append(1);
+    }
+    global cModel.append(model);
     if (only != "") {
         global cStatic.append(1);
         global cOwner.append("");
@@ -230,7 +253,8 @@ function removeDisplays(ids: list) {
 /** Spawns one car's part displays at `origin` (only part `only` when set):
  * [every display in carPartData order, the rigid ones, the movers in mover
  * order]. With `only` set, the other entries of the first list are "". */
-function spawnDisplays(origin: loc, paint: num, accent: num, only: str): list {
+function spawnDisplays(origin: loc, paint: num, accent: num, only: str, model: num = 1): list {
+    line items = carPartItems(model);
     line all = [];
     line rigid = [];
     line move = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
@@ -240,7 +264,7 @@ function spawnDisplays(origin: loc, paint: num, accent: num, only: str): list {
             line all.append("");
             continue;
         }
-        line look = item("stone").setModel(line p[2] as str).setModelDataNumbers(paint, accent, type="Colors");
+        line look = item("stone").setModel(line items[line all.len() + 1] as str).setModelDataNumbers(paint, accent, type="Colors");
         game.spawnItemDisplay(origin, line look);
         lastEntity.setDisplayTeleportDuration(1);
         // Full brightness: the displays stand on the car origin at ground
@@ -340,10 +364,13 @@ function clearCars {
     global cAwake = [];
     global cStatic = [];
     global cOwner = [];
+    global cModel = [];
     global cImpact = [];
     global cGrace = [];
     global cThr = [];
     global cTc = [];
+    global cBoost = [];
+    global cBov = [];
     global wComp = [];
     global wSpin = [];
     global wMu = [];

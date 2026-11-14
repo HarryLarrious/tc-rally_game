@@ -1,6 +1,28 @@
 # Car design
 
 The rally car is a two-door hatchback with four-wheel drive and a front engine.
+It also comes as a **hypercar** (`pack/src/car_hyper.py`): the same cage
+layout, suspension and drive shafts under a low, wide, angular body (a hood
+that slopes down into a low nose with a black scoop stripe, fender crests
+breaking into steeper tips with slim LED headlight slashes, dark intakes under
+them, black arch liners, closed five-spoke wheels, a teardrop canopy with a raked
+windshield and flying buttresses, rear haunches with side intakes, a louvered
+engine deck, a full-width tail light bar, a carbon splitter and diffuser, a
+swan-neck wing). Its engine sits behind the seats: a 4.0 twin-turbo V8
+mounted lengthwise, with a transaxle behind it, the fuel cell in the nose and
+twin center tail pipes, on its own chassis with the firewall behind the seats.
+Its parts keep the rally car's ids (so HP, parents and effects are the same);
+their models (`rally:car_hyper/<part>`), hitboxes and shields differ
+(`parts_hyper.json`, `carPartItems(m)` and `carPartBoxes(m)` in
+`tc/car_data.tc`). The viewer shows it with `index.html?car=hyper`.
+
+In game the V8 makes 520 N m without boost (best at 4500 rpm) and up to
+850 N m with it: the turbos build boost under throttle above 2000 rpm, in
+about a second, and a lift or shift dumps it through the blow-off valve. The
+HUD shows the boost in bar. It sounds like a cross-plane V8 (its own clips
+from `pack/src/engine_sound.py`), with a turbo whistle that follows the boost,
+the blow-off valve, and deeper overrun pops that spit flames from the tail
+pipes. The center of mass and total mass stay the rally car's.
 It is built from 52 separate parts. Each part is its own resource-pack model on
 its own item display, so any part can take damage, fail, or break off.
 

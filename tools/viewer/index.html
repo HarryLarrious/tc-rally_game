@@ -39,7 +39,11 @@
   <div id="list"></div>
   <div id="info">Select a part.</div>
 </div>
-<script src="car_data.js"></script>
+<script>
+// ?car=hyper shows the hypercar body (car_data_hyper.js).
+const look = new URLSearchParams(location.search).get("car");
+document.write('<script src="car_data' + (look ? "_" + look.replace(/[^a-z]/g, "") : "") + '.js"><\/script>');
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
