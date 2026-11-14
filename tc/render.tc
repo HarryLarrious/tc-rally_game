@@ -55,9 +55,9 @@ function carRender(c: num) {
     line ca = num.cos(line a);
     line sa = num.sin(line a);
     setMover(line move[21] as str, vec(line ca, line sa * line ct, line sa * line st), vec(0 - line sa, line ca * line ct, line ca * line st), vec(0, 0 - line st, line ct), vec(global gSteerX, global gSteerY, global gSteerZ), L, U, F, 1);
-    // The driver's eye, in the car frame: in the driver model's head (it
-    // turns with the player's look), or where that head would be.
-    line eye = vec(0.33, 1.2, -0.12);
+    // The driver's eye, in the car frame: the center of the driver model's
+    // head, or where that head would be.
+    line eye = vec(0.33, 1.155, -0.167);
     if (global cDriver[c] != "") {
         line eye = driverRender(c, line at, L, U, F);
     }

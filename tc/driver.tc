@@ -143,12 +143,12 @@ function driverArm(id: str, s: vec, h: vec, width: num, L: vec, U: vec, F: vec) 
 }
 
 /** Draws the driver model of car c and returns where the driver's eye goes
- * (car frame): between the model's eyes, a little inside its face. `at` is
- * the car origin all its displays stand on. */
+ * (car frame): the center of the model's head. `at` is the car origin all
+ * its displays stand on. */
 function driverRender(c: num, at: loc, L: vec, U: vec, F: vec): vec {
     line uuid = global cDriver[c];
     if (!global dOf.hasKeys(line uuid)) {
-        return vec(0.33, 1.2, -0.12);
+        return vec(0.33, 1.155, -0.167);
     }
     line ids = global dOf[line uuid] as list[str];
     select entitiesByName(line ids);
@@ -203,9 +203,9 @@ function driverRender(c: num, at: loc, L: vec, U: vec, F: vec): vec {
     }
     driverArm(line ids[2], global dShoulderR, line handR, line width, L, U, F);
     driverArm(line ids[3], global dShoulderL, line handL, line width, L, U, F);
-    // Eye: 0.5 px above and 2.5 px in front of the head's center (the face is
-    // 4 px out), so the camera sees from the model's eyes.
-    return line headC + line hu * (0.5 * global dPx) + line hf * (2.5 * global dPx);
+    // Eye: the head's center, so the camera only moves with the head's
+    // position, not with where it looks.
+    return line headC;
 }
 
 /** @dkeep: toggles leaving the model in the car on getting out (to look at
