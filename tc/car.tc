@@ -72,6 +72,42 @@ function carAccents(): list {
     return [0x1E5AA8, 0xF0F0F0, 0xF0B429, 0x202124, 0xF0F0F0, 0xC81E1E];
 }
 
+/** The garage's colors (menu.tc), as numbers and as hex text. */
+function carColors(): list {
+    return [0xF0F0F0, 0xA8ADB3, 0x202124, 0xC81E1E, 0xF07818, 0xF0B429, 0x2E8B3A, 0x1E5AA8];
+}
+
+function carColorHexes(): list {
+    return ["#F0F0F0", "#A8ADB3", "#202124", "#C81E1E", "#F07818", "#F0B429", "#2E8B3A", "#1E5AA8"];
+}
+
+/** Per player UUID: the chosen primary and secondary color (index into
+ * carColors). */
+declare saved carPaintSel: dict[num];
+declare saved carAccentSel: dict[num];
+
+/** The player's primary color index (white when not chosen). */
+function carPaintOf(uuid: str): num {
+    if (saved carPaintSel.hasKeys(uuid)) {
+        return saved carPaintSel[uuid];
+    }
+    return 1;
+}
+
+/** The player's secondary color index (blue when not chosen). */
+function carAccentOf(uuid: str): num {
+    if (saved carAccentSel.hasKeys(uuid)) {
+        return saved carAccentSel[uuid];
+    }
+    return 8;
+}
+
+/** Spawns a car for the player (default) in their garage colors. */
+function spawnCarFor(at: loc, only: str = ""): num {
+    line cols = carColors();
+    return spawnCar(at, cols[carPaintOf(default.uuid)] as num, cols[carAccentOf(default.uuid)] as num, only);
+}
+
 /** Center of mass in the car frame. */
 function carCom(): vec {
     return vec(0, 0.5, 0.05);
@@ -288,7 +324,7 @@ function clearCars {
 }
 
 /** Spawns a car 6 blocks in front of the player on their feet level, facing
- * the way they look turned by `turn` degrees, with the next paint scheme.
+ * the way they look turned by `turn` degrees, in their garage colors.
  * With `only` set to a part id, spawns just that part. */
 function spawnCarHere(turn: num = 0, only: str = "") {
     ensureLoop();
@@ -297,7 +333,6 @@ function spawnCarHere(turn: num = 0, only: str = "") {
     line at = loc(line feet.x, line feet.y, line feet.z, 0, line yaw);
     line at = line at.shiftInDirection(6, direction="Forward");
     line at = loc(line at.x, line at.y, line at.z, 0, line yaw + turn);
-    line k = global carCount % carPaints().len() + 1;
-    line c = spawnCar(line at, carPaints()[line k] as num, carAccents()[line k] as num, only);
+    line c = spawnCarFor(line at, only);
     default.sendMessage(s"<gray>Car <yellow>%var(c)</yellow> spawned. <yellow>@drive</yellow> to get in.");
 }

@@ -106,6 +106,14 @@ playerevent leave {
 /** Advances every car one tick: input, physics, drawing, the driver HUD. */
 function carsTick {
     global rTick += 1;
+    // A spawn cut off halfway (a code send or a halted thread) leaves the
+    // car lists of different lengths, and every car after it would break
+    // the physics each tick: start over without cars.
+    if (global cPos.len() != global carCount || global cStatic.len() != global carCount || global wExcess.len() != global carCount * 4 || global cSeat.len() != global carCount) {
+        allPlayers.sendMessage(s"<gray>The car lists got out of step (a spawn was cut off); all cars were removed.");
+        clearCars();
+        return;
+    }
     // Forget the ground heights now and then, so built or broken blocks count.
     if (global rTick % 400 == 0) {
         global gColCache = {};
@@ -115,6 +123,7 @@ function carsTick {
         if (global cStatic[line c] == 1) {
             continue;
         }
+        carStateCheck(line c);
         line driver = global cDriver[line c];
         if (line driver == "") {
             if (global cAwake[line c] <= 0) {
@@ -238,4 +247,27 @@ process carLoop {
         }
         wait;
     }
+}
+
+/** Puts car c back on its wheels at its seat when its body state is not
+ * real vectors any more (a physics blow-up gives NaN, which DiamondFire
+ * cannot pass to a function, and every tick would halt the car loop). */
+function carStateCheck(c: num) {
+    line p = global cPos[c];
+    line f = global cF[c];
+    line u = global cU[c];
+    line v = global cVel[c];
+    if (var.isType(line p, type="Vector") && var.isType(line f, type="Vector") && var.isType(line u, type="Vector") && var.isType(line v, type="Vector")) {
+        return;
+    }
+    select entitiesByName(global cSeat[c]);
+    line at = selectedEntity.location;
+    select reset;
+    global cPos[c] = vec(line at.x, line at.y + 1, line at.z);
+    global cVel[c] = vec(0, 0, 0);
+    global cW[c] = vec(0, 0, 0);
+    global cL[c] = vec(1, 0, 0);
+    global cU[c] = vec(0, 1, 0);
+    global cF[c] = vec(0, 0, 1);
+    global cGrace[c] = 40;
 }

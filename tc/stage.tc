@@ -9,7 +9,19 @@ declare global stPts: list;
 declare global stK: list;
 declare global stT: list;
 declare saved stBest: num;
+/** The record holder's UUID (older records hold a name). */
 declare saved stBestName: str;
+/** Player data is kept by UUID (names can change); this is each UUID's
+ * latest name, for showing records. */
+declare saved playerName: dict[str];
+
+/** The latest name of player `id` (a UUID); an old record's name as is. */
+function playerNameOf(id: str): str {
+    if (saved playerName.hasKeys(id)) {
+        return saved playerName[id];
+    }
+    return id;
+}
 
 function stageLoad {
     if (global gnReady == 1) {
@@ -76,15 +88,17 @@ function stageTick(c: num) {
     } else {
         global stK[c] = 0;
         line name: str = "%selected";
+        line who = selected.uuid;
+        saved playerName[line who] = line name;
         line sn = stageName();
         allPlayers.sendMessage(s"<gold><b>Stage %var(sn)</b></gold> <white>%var(name)</white> <gray>finished in</gray> <yellow><b>%var(ts)</b></yellow>");
         if (global gnSeed > 0) {
-            if (gnRecord(line name, line t) == 1) {
+            if (gnRecord(line who, line t) == 1) {
                 allPlayers.sendMessage(s"<gold>New record for stage %var(sn)!");
             }
         } else if (saved stBest == 0 || line t < saved stBest) {
             saved stBest = line t;
-            saved stBestName = line name;
+            saved stBestName = line who;
             allPlayers.sendMessage(s"<gold>New stage record!");
         }
         selected.sendTitle(s"<yellow><b>%var(ts)", s"<gray>Stage time", 60, 5, 20);
@@ -171,8 +185,7 @@ function startCommand(arg: str = "") {
     default.teleport(loc(line at.x + line side.x, line at.y + 0.2, line at.z + line side.z, 0, line yaw));
     default.setToAdventureMode();
     wait(10);
-    line k = global carCount % carPaints().len() + 1;
-    line c = spawnCar(line at, carPaints()[line k] as num, carAccents()[line k] as num);
+    line c = spawnCarFor(line at);
     enterNearestCar();
     while (global stK.len() < line c) {
         global stK.append(0);

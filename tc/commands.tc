@@ -2,6 +2,8 @@
 // command event.
 
 playerevent join {
+    // Records keep UUIDs; this keeps the name they show current.
+    saved playerName[default.uuid] = "%default";
     packSend();
     ensureLoop();
     parkSpawn();

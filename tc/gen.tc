@@ -65,7 +65,8 @@ declare global gnClearAll: num;
  * built them (-1 while building). */
 declare saved gnBuilt: dict[num];
 declare saved gnBuiltBy: dict[num];
-/** The last seed played, and the best time and driver per seed. */
+/** The last seed played, and the best time and its driver's UUID per
+ * seed. */
 declare saved gnLast: num;
 declare saved gnBest: dict[num];
 declare saved gnBestName: dict[str];
@@ -708,13 +709,13 @@ function gnBestText(seed: num): str {
         return "";
     }
     line t = stageTime(saved gnBest[line key]);
-    line who = saved gnBestName[line key];
+    line who = playerNameOf(saved gnBestName[line key]);
     return "%var(t) by %var(who)";
 }
 
-/** Keeps the best time t (seconds) for the current seed; 1 when it is a
- * new record. */
-function gnRecord(name: str, t: num): num {
+/** Keeps the best time t (seconds) for the current seed, driven by player
+ * UUID `who`; 1 when it is a new record. */
+function gnRecord(who: str, t: num): num {
     line seed = global gnSeed;
     line key = "%var(seed)";
     if (saved gnBest.hasKeys(line key)) {
@@ -723,7 +724,7 @@ function gnRecord(name: str, t: num): num {
         }
     }
     saved gnBest[line key] = t;
-    saved gnBestName[line key] = name;
+    saved gnBestName[line key] = who;
     return 1;
 }
 

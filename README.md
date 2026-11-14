@@ -208,6 +208,18 @@ colored background, scaled to size; buttons light up yellow under the
 crosshair. Left click picks, right click or Shift closes. The board holds
 the gearbox choice, the driver model's arm width, the stage record with a
 start button, and spawn car.
+
+The garage is a second panel hinged to the board's right edge, turned 40
+degrees toward the player (each panel has its own frame, and a click hits
+whichever panel the crosshair is on). It holds the car model (one for
+now), primary and secondary colors (8 swatches each, with a livery
+preview), and rows for decals and parts to come. The colors are used by
+every car the player spawns.
+
+Player data is kept by UUID, since names can change: gearbox, arm width
+and colors per player, and stage records hold the driver's UUID. A saved
+UUID-to-name table (updated on join and at the finish) shows the latest
+name.
 Only the player who opened it sees it.
 
 The physics (`tc/physics.tc`) is one rigid body per car, stepped once per
