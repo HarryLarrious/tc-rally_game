@@ -40,8 +40,10 @@ function carRender(c: num) {
     selectedEntity.setDisplayInterpolation(1, 0);
     select reset;
 
-    // The driver's seat, on the left seat cushion.
-    line seat = line o + L * 0.33 + U * 0.1 - F * 0.05;
+    // The driver's seat, on the left seat cushion. A rider's eye is 1.03 above
+    // the seat entity, so this puts the first-person camera at (0.33, 1.2,
+    // -0.2): inside the driver model's head, a little behind its center.
+    line seat = line o + L * 0.33 + U * 0.17 - F * 0.2;
     select entitiesByName(global cSeat[c]);
     selectedEntity.teleport(loc(line seat.x, line seat.y, line seat.z));
     select reset;
@@ -52,14 +54,18 @@ function carRender(c: num) {
     repeat (line i to 4) {
         renderCorner(c, line i, line move, line links, line steer, L, U, F);
     }
-    // Steering wheel: the column tilt, then the wheel turned 9x the road wheels.
+    // Steering wheel: the column tilt, then the wheel turned 9x the road wheels
+    // (a left turn, steer > 0, turns it anticlockwise as the driver sees it).
     line tilt = global gSteerTilt;
     line ct = num.cos(line tilt);
     line st = num.sin(line tilt);
-    line a = line steer * 9;
+    line a = 0 - line steer * 9;
     line ca = num.cos(line a);
     line sa = num.sin(line a);
     setMover(line move[21] as str, vec(line ca, line sa * line ct, line sa * line st), vec(0 - line sa, line ca * line ct, line ca * line st), vec(0, 0 - line st, line ct), vec(global gSteerX, global gSteerY, global gSteerZ), L, U, F, 1);
+    if (global cDriver[c] != "") {
+        driverRender(c, line at, L, U, F);
+    }
 }
 
 /** Draws corner i of car c: wheel and upright every tick; arm, spring and

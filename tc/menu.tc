@@ -112,6 +112,10 @@ function menuChosen(id: str): num {
     if ((id == "gear_auto" && line manual == 0) || (id == "gear_manual" && line manual == 1)) {
         return 1;
     }
+    line slim = driverSlimOf(default.uuid);
+    if ((id == "arms_classic" && line slim == 0) || (id == "arms_slim" && line slim == 1)) {
+        return 1;
+    }
     return 0;
 }
 
@@ -164,10 +168,14 @@ function menuBuild(st: dict): list {
         line out.append({kind: "deco", ent: menuRect(st, -1.6 + 0.08 + (line i - 1) * 0.16, 0.715, 0.16, 0.09, line col, 100, 0.02)});
     }
     // Gearbox.
-    line out.append({kind: "deco", ent: menuText(st, -1.05, 0.4, "GEARBOX", "label", 0.55)});
-    line out.append(menuButton(st, "gear_auto", 0.05, 0.4, 0.8, 0.22, "AUTO", 0.45, "gear auto"));
-    line out.append(menuButton(st, "gear_manual", 0.95, 0.4, 0.8, 0.22, "MANUAL", 0.45, "gear manual"));
-    line out.append({kind: "text", id: "gear_note", ent: menuText(st, 0.45, 0.18, menuGearNote(), "body", 0.36)});
+    line out.append({kind: "deco", ent: menuText(st, -1.05, 0.5, "GEARBOX", "label", 0.55)});
+    line out.append(menuButton(st, "gear_auto", 0.05, 0.5, 0.8, 0.2, "AUTO", 0.45, "gear auto"));
+    line out.append(menuButton(st, "gear_manual", 0.95, 0.5, 0.8, 0.2, "MANUAL", 0.45, "gear manual"));
+    line out.append({kind: "text", id: "gear_note", ent: menuText(st, 0.45, 0.32, menuGearNote(), "body", 0.34)});
+    // The driver model's arms: match the player's skin (Classic 4 px or Slim 3 px).
+    line out.append({kind: "deco", ent: menuText(st, -1.05, 0.12, "ARMS", "label", 0.55)});
+    line out.append(menuButton(st, "arms_classic", 0.05, 0.12, 0.8, 0.2, "CLASSIC", 0.45, "arms classic"));
+    line out.append(menuButton(st, "arms_slim", 0.95, 0.12, 0.8, 0.2, "SLIM", 0.45, "arms slim"));
     // Divider.
     line out.append({kind: "deco", ent: menuRect(st, 0, 0.0, 2.9, 0.012, "#3A3F47", 100, 0.02)});
     // The stage.
@@ -333,7 +341,25 @@ function menuClick {
 /** Runs a menu action for the player. */
 function menuAction(action: str) {
     line uuid = default.uuid;
-    if (action == "gear auto" || action == "gear manual") {
+    if (action == "arms classic" || action == "arms slim") {
+        if (action == "arms slim") {
+            saved driverSlim[line uuid] = 1;
+        } else {
+            saved driverSlim[line uuid] = 0;
+        }
+        default.playSound(snd("UI Button Click"));
+        line st = global menuOf[line uuid] as dict;
+        for (line wv of line st["widgets"] as list) {
+            line w = line wv as dict;
+            if (line w["kind"] as str == "button") {
+                if (line w["id"] as str == line st["hover"] as str) {
+                    menuPaint(line w, 1);
+                } else {
+                    menuPaint(line w, 0);
+                }
+            }
+        }
+    } else if (action == "gear auto" || action == "gear manual") {
         if (action == "gear manual") {
             saved gearMode[line uuid] = 1;
         } else {
@@ -375,6 +401,10 @@ function menuAction(action: str) {
  * an item also makes right clicks reach the plot (the manual gearbox). */
 function giveRoadbook {
     line book = item("paper").setName(s"<#FFC20E><b>Roadbook</b></#FFC20E> <gray>(right click)");
+    // Driving: the same book, drawn as nothing (the driver model holds the wheel).
+    if (carOf(default.uuid) != 0) {
+        line book = driverHandItem();
+    }
     default.setItemInSlot(line book, 1);
     default.setHotbarSlot(1);
 }

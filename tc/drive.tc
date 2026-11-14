@@ -45,7 +45,7 @@ function enterNearestCar {
     global cAwake[line best] = 60;
     carRender(line best);
     default.rideEntity(global cSeat[line best]);
-    default.setHotbarSlot(1);
+    driverSpawn(line best);
     default.sendMessage(s"<gray><yellow>W/S</yellow> throttle/brake, <yellow>A/D</yellow> steer, hold <yellow>Shift</yellow> handbrake, <yellow>F</yellow> get out, <yellow>Q</yellow> back on wheels.");
 }
 
@@ -57,9 +57,11 @@ function exitCar {
     }
     global cDriver[line c] = "";
     global cAwake[line c] = 60;
+    driverRemove(default.uuid);
     default.rideEntity();
     line p = global cPos[line c] + global cL[line c] * 1.6 + vec(0, 0.6, 0);
     default.teleport(loc(p.x, p.y, p.z), keepRot="True");
+    giveRoadbook();
 }
 
 playerevent dismount {
@@ -98,6 +100,7 @@ playerevent leave {
         global cDriver[line c] = "";
         global cAwake[line c] = 60;
     }
+    driverRemove(default.uuid);
 }
 
 /** Advances every car one tick: input, physics, drawing, the driver HUD. */

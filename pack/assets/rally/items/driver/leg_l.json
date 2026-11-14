@@ -1,0 +1,27 @@
+{
+ "model": {
+  "type": "minecraft:special",
+  "base": "minecraft:item/template_skull",
+  "model": {
+   "type": "minecraft:player_head"
+  },
+  "transformation": [
+   -0.318673,
+   -0.066961,
+   -0.018682,
+   0.056519,
+   0.02232,
+   -0.16669,
+   -0.314348,
+   0.936655,
+   0.018682,
+   -0.943043,
+   0.05689,
+   0.128478,
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ }
+}

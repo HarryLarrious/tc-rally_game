@@ -234,6 +234,7 @@ function dropStaleCars {
 function clearCars {
     repeat (line c to global carCount) {
         if (global cDriver[line c] != "") {
+            driverRemove(global cDriver[line c]);
             select playersByName(global cDriver[line c]);
             selected.rideEntity();
             select reset;

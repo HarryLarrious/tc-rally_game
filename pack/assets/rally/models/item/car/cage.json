@@ -1,10 +1,11 @@
 {
  "textures": {
+  "accent": "rally:item/car/accent",
   "cage": "rally:item/car/cage",
   "darksteel": "rally:item/car/darksteel",
   "plastic": "rally:item/car/plastic",
   "seat": "rally:item/car/seat",
-  "particle": "rally:item/car/cage"
+  "particle": "rally:item/car/accent"
  },
  "elements": [
   {
@@ -2148,6 +2149,158 @@
       16
      ],
      "texture": "#darksteel"
+    }
+   }
+  },
+  {
+   "from": [
+    7.992,
+    14.112,
+    10.1953
+   ],
+   "to": [
+    8.168,
+    14.288,
+    11.5647
+   ],
+   "rotation": {
+    "origin": [
+     8.08,
+     14.2,
+     10.88
+    ],
+    "x": -61.2,
+    "y": 165.964,
+    "z": 0.0
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#darksteel"
+    }
+   }
+  },
+  {
+   "from": [
+    7.88,
+    14.72,
+    10.32
+   ],
+   "to": [
+    8.44,
+    15.12,
+    10.8
+   ],
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#accent",
+     "tintindex": 1
     }
    }
   }

@@ -6,6 +6,7 @@ playerevent join {
     ensureLoop();
     parkSpawn();
     giveRoadbook();
+    driverHideAllFrom();
 }
 
 playerevent respawn {
@@ -47,6 +48,9 @@ playerevent command {
         enterNearestCar();
     } else if (line cmd == "exit") {
         exitCar();
+    } else if (line cmd == "dkeep") {
+        // @dkeep: debug, getting out leaves the driver model in the car.
+        driverKeepToggle();
     } else if (line cmd == "hit") {
         hitCommand(line words);
     } else if (line cmd == "damage") {

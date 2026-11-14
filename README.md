@@ -13,6 +13,8 @@ separate parts, so they can be damaged and broken apart.
 | [pack/src/car_parts.py](pack/src/car_parts.py) | Generates the car models, textures and part data |
 | [tc/](tc/) | Terracotta code for the plot (206003, Mega): pack, commands, car spawning; `car_data.tc` is generated |
 | [pack/src/engine_sound.py](pack/src/engine_sound.py) | Synthesizes the engine sound loops |
+| [pack/src/driver.py](pack/src/driver.py) | Generates the driver model's item models and `tc/driver_data.tc` (its pose) |
+| [pack/assets/minecraft/shaders/core/](pack/assets/minecraft/shaders/core/) | Entity core shader: draws player heads as the driver's body parts |
 | [tools/build_pack.py](tools/build_pack.py) | Validates, zips and publishes the pack to the `pack-dist` branch |
 | [tools/viewer/](tools/viewer/) | 3D viewer for the car models |
 | [map/gen_map.py](map/gen_map.py) | Designs the rally map and writes `tc/map_data.tc` and [map/preview.png](map/preview.png) |
@@ -25,7 +27,8 @@ python3 pack/src/car_parts.py
 
 Needs Python 3 with Pillow. It rewrites the files under
 `pack/assets/rally/`, `car/parts.json`, `car/PARTS.md` and
-`tools/viewer/car_data.js`.
+`tools/viewer/car_data.js`. `python3 pack/src/driver.py` rewrites the driver
+model's files (`pack/assets/rally/items/driver/`, `tc/driver_data.tc`).
 
 ## Publish the pack
 
@@ -34,6 +37,9 @@ python3 tools/build_pack.py --publish --push
 ```
 
 Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
+The build also compiles every core shader in the pack with `glslc` (shaderc)
+the way the 26.3 client does, once per define set the game uses for it
+(`tools/shader_variants.json`), and stops on any error.
 
 ## In game
 
@@ -51,6 +57,7 @@ Then put the printed URL in `packUrl()` in `tc/pack.tc` and send the code.
 | `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
 | `@drive` | Get in the nearest free car within 8 blocks |
 | `@exit` | Get out (same as F) |
+| `@dkeep` | Debug: getting out leaves the driver model where it sat, to look at it from outside; `@dkeep` again removes those |
 | `@tune [name value \| reset]` | Show or set physics tunables: spring, damper, grip, power, brake, steer, lat, smooth, links |
 | `@dbg` | Toggle the physics debug readout in the action bar |
 | `@damage` | List the damaged parts of your car (or the nearest) |
@@ -116,6 +123,36 @@ tires spin. Manual shifts only on clicks: left click up, right click down.
 There is no traction control: spinning or sliding tires rev the engine into
 the 7800 rpm limiter, which cuts the power for a tick and drops the revs.
 
+## Driver model
+
+While someone drives, the car shows them sitting in it with their own skin
+(`tc/driver.tc`), and the real player is hidden: from the other players with
+Set Entity Hidden, from the driver's own third-person view with invisibility,
+and the Roadbook in their hand turns into an item that draws nothing. The
+model's head looks where the player looks (within what a neck allows), the
+hands hold the steering wheel and turn it up to 60 degrees, the right hand
+goes to the gear lever on each shift and to the handbrake while it is pulled.
+In first person the driver sees their arms on the wheel; the head is not
+drawn when the camera is inside it.
+
+Each body part is an item display holding the driver's player head, the only
+item Minecraft draws with a player's skin. The pack's entity core shader
+(`pack/assets/minecraft/shaders/core/entity.vsh` / `.fsh`) recognizes a part
+by its display's brightness override: sky light 0 and block light = part id
+(1 head, 2 torso, 3/4 right/left arm, 5/6 right/left leg, 7/8 slim arms). For
+those it maps the head's texture net onto that part's net of the skin, so a
+head scaled to 4 x 12 x 4 pixels is drawn as an arm, and lights it like the
+car (full bright). Torso and legs are posed in their item models
+(`pack/src/driver.py`, `rally:driver/torso`, `leg_r`, `leg_l`) and share the
+car's rotation matrix; head and arms use `rally:driver/unit` (a 1 x 1 x 1
+head) and get their own matrix every tick. The model is about 0.68 of a
+player's size, so it fits under the roof. The service board's ARMS choice
+(Classic 4 px or Slim 3 px) should match the player's skin.
+
+Without the pack the parts show as plain heads. A real player head standing
+in sky light 0 with block light 1 to 8 (deep indoors) would also be redrawn,
+which is the cost of marking parts by brightness.
+
 ## Menu
 
 `tc/menu.tc` draws the service board: like the dueling game's menus, the
@@ -124,7 +161,8 @@ displays, but here they form a flat board in the world (no shader), so the
 crosshair is the cursor. Panels are text displays holding one space with a
 colored background, scaled to size; buttons light up yellow under the
 crosshair. Left click picks, right click or Shift closes. The board holds
-the gearbox choice, the stage record with a start button, and spawn car.
+the gearbox choice, the driver model's arm width, the stage record with a
+start button, and spawn car.
 Only the player who opened it sees it.
 
 The physics (`tc/physics.tc`) is one rigid body per car, stepped once per

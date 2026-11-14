@@ -1,0 +1,220 @@
+// The driver model: the player's own skin, sitting in the car.
+//
+// Six item displays hold the driver's player head. The pack's core shader
+// (pack/assets/minecraft/shaders/core/entity.*) draws a head as another body
+// part when its display's brightness override marks it: sky light 0, block
+// light = part id (1 head, 2 torso, 3/4 right/left arm, 5/6 right/left leg,
+// 7/8 slim right/left arm). Torso and legs are posed in their item models
+// (pack/src/driver.py) and turn with the car like its rigid parts. Head and
+// arms are posed here every tick: the head looks where the player looks, the
+// hands hold the steering wheel and turn it, and the right hand goes to the
+// gear lever on a shift and to the handbrake while it is pulled.
+//
+// The real player is hidden while driving: from the others with Set Entity
+// Hidden, from themselves (third person) with invisibility, and the hand item
+// becomes one that draws nothing. The shader drops the model's head when the
+// camera is inside it, so first person sees the arms on the wheel.
+
+/** Per driver UUID: the model's display UUIDs [head, right arm, left arm,
+ * torso, right leg, left leg]. */
+declare global dOf: dict[list];
+/** Per driver UUID: ticks left with the right hand at the gear lever, and
+ * the car's shift timer last tick (a rise is a new shift). */
+declare global dShiftT: dict[num];
+declare global dLastShift: dict[num];
+/** Debug (@dkeep): 1 leaves the model in the car when the driver gets
+ * out; dKept holds those displays until @dkeep is toggled again. */
+declare global dKeep: num;
+declare global dKept: list;
+/** Per player UUID: 1 for slim (3 px) arms. */
+declare saved driverSlim: dict[num];
+
+/** 1 when the player chose slim arms for their driver model. */
+function driverSlimOf(uuid: str): num {
+    if (saved driverSlim.hasKeys(uuid)) {
+        return saved driverSlim[uuid];
+    }
+    return 0;
+}
+
+/** The item the driver holds while driving: draws nothing, but still makes
+ * clicks fire. */
+function driverHandItem(): item {
+    return item("paper").setModel("rally:empty").setName(s"<#FFC20E><b>Roadbook</b></#FFC20E> <gray>(right click)");
+}
+
+/** Spawns the model of the player (default), the driver of car c, and hides
+ * the real player. */
+function driverSpawn(c: num) {
+    line uuid = default.uuid;
+    driverRemove(line uuid);
+    loadDriverPose();
+    line head = item("player_head").setHeadTexture(line uuid);
+    line o = global cPos[c];
+    line at = loc(line o.x, line o.y, line o.z);
+    line arm = 3;
+    if (driverSlimOf(line uuid) == 1) {
+        line arm = 7;
+    }
+    line armL = line arm + 1;
+    line specs = ["rally:driver/unit 1", "rally:driver/unit %var(arm)", "rally:driver/unit %var(armL)"];
+    for (line s of driverRigidParts()) {
+        line specs.append(line s);
+    }
+    line ids = [];
+    for (line s of line specs) {
+        line p = (line s as str).split(" ");
+        game.spawnItemDisplay(line at, line head.setModel(line p[1] as str));
+        lastEntity.setDisplayTeleportDuration(1);
+        lastEntity.setDisplayBrightness(num.parse(line p[2] as str), 0);
+        line ids.append(lastEntity.uuid);
+    }
+    global dOf[line uuid] = line ids;
+    global dShiftT[line uuid] = 0;
+    global dLastShift[line uuid] = 0;
+    driverHide(line uuid, 1);
+    default.givePotionEffect(pot("Invisibility", 1, 1000000), showIcon="False", particles="None");
+    default.setItemInSlot(driverHandItem(), 1);
+    default.setHotbarSlot(1);
+}
+
+/** Removes the model of player `uuid` and shows the real player again. The
+ * player may have left: only the displays and the hiding are undone then. */
+function driverRemove(uuid: str) {
+    if (!global dOf.hasKeys(uuid)) {
+        return;
+    }
+    if (global dKeep == 1) {
+        for (line id of global dOf[uuid] as list) {
+            global dKept.append(line id);
+        }
+    } else {
+        select entitiesByName(global dOf[uuid] as list[str]);
+        selectedEntity.remove();
+        select reset;
+    }
+    global dOf.remove(uuid);
+    driverHide(uuid, 0);
+    // (Selects nobody when the player has left.)
+    select playersByName(uuid);
+    selected.removePotionEffect(pot("Invisibility"));
+    select reset;
+}
+
+/** Hides (1) or shows (0) player `uuid` to every other player. */
+function driverHide(uuid: str, hide: num) {
+    select !playersByName(uuid);
+    if (hide == 1) {
+        selected.setEntityHidden([uuid], hidden="Enable");
+    } else {
+        selected.setEntityHidden([uuid], hidden="Disable");
+    }
+    select reset;
+}
+
+/** Hides every driver from the player (default) who just joined. */
+function driverHideAllFrom {
+    for (line uuid, line ids of global dOf) {
+        default.setEntityHidden([line uuid], hidden="Enable");
+    }
+}
+
+/** Sets display `id` to show a part of size (sx, sy, sz) skin pixels with
+ * axes (left a, up b, forward f) centered at t, all in the car frame. */
+function driverPart(id: str, a: vec, b: vec, f: vec, sx: num, sy: num, sz: num, t: vec, L: vec, U: vec, F: vec) {
+    line px = global dPx;
+    setMover(id, a * (0 - sx * line px), b * (sy * line px), f * (0 - sz * line px), t, L, U, F, 1);
+}
+
+/** Poses an arm from shoulder s to hand h (car frame): the arm hangs along
+ * the line with its front turned the least way from straight down, and
+ * stretches a little when the hand is out of reach. */
+function driverArm(id: str, s: vec, h: vec, width: num, L: vec, U: vec, F: vec) {
+    line d = h - s;
+    line len = d.len();
+    line k = num.clamp(line len / (10 * global dPx), 0.85, 1.2);
+    line b = d * (1 / line len);
+    // fwd: (0, 0, 1) turned by the rotation taking (0, -1, 0) to b.
+    line q = 1 - line b.y;
+    line f = vec(0 - line b.x * line b.z / line q, line b.z, 1 - line b.z * line b.z / line q).setLength(1);
+    line up = line b * -1;
+    line a = line up.cross(line f);
+    driverPart(id, line a, line up, line f, width, 12 * line k, 4, s + line b * (4 * global dPx * line k), L, U, F);
+}
+
+/** Draws the driver model of car c (its driver must have one). `at` is the
+ * car origin all its displays stand on. */
+function driverRender(c: num, at: loc, L: vec, U: vec, F: vec) {
+    line uuid = global cDriver[c];
+    if (!global dOf.hasKeys(line uuid)) {
+        return;
+    }
+    line ids = global dOf[line uuid] as list[str];
+    select entitiesByName(line ids);
+    selectedEntity.teleport(at);
+    select reset;
+    select entitiesByName([line ids[4], line ids[5], line ids[6]]);
+    selectedEntity.setDisplayTransformationMatrix([L.x, U.x, F.x, 0, L.y, U.y, F.y, 0, L.z, U.z, F.z, 0, 0, 0, 0, 1]);
+    selectedEntity.setDisplayInterpolation(1, 0);
+    select reset;
+
+    // Head: looks where the player looks, within what a neck allows.
+    select playersByName(line uuid);
+    line eye = selected.eyeLocation;
+    select reset;
+    line dir = line eye.getDirection();
+    line hf = vec(line dir.dot(L), num.clamp(line dir.dot(U), -0.6, 0.5), num.max(line dir.dot(F), 0.25)).setLength(1);
+    line hl = vec(0, 1, 0).cross(line hf).setLength(1);
+    line hu = line hf.cross(line hl);
+    driverPart(line ids[1], line hl, line hu, line hf, 8, 8, 8, global dNeck + line hu * (4 * global dPx), L, U, F);
+
+    // Hands on the rim, turning with the wheel up to 60 degrees (then the
+    // wheel slides through them).
+    line turn = num.clamp(0 - global cSteer[c] * 9, -60, 60);
+    line tilt = global gSteerTilt;
+    line ct = num.cos(line tilt);
+    line st = num.sin(line tilt);
+    line w = vec(global gSteerX, global gSteerY, global gSteerZ);
+    line r = global dRim;
+    line pl = global dGripL + line turn;
+    line pr = global dGripR + line turn;
+    line handL = line w + vec(num.cos(line pl), num.sin(line pl) * line ct, num.sin(line pl) * line st) * line r;
+    line handR = line w + vec(num.cos(line pr), num.sin(line pr) * line ct, num.sin(line pr) * line st) * line r;
+
+    // Right hand: to the gear lever for a few ticks on a shift, to the
+    // handbrake while it is held.
+    if (global cShift[c] > global dLastShift[line uuid]) {
+        global dShiftT[line uuid] = 7;
+    }
+    global dLastShift[line uuid] = global cShift[c];
+    line t = global dShiftT[line uuid];
+    if (line t > 0) {
+        global dShiftT[line uuid] = line t - 1;
+        line k = num.clamp(num.min(7 - line t, line t) / 2, 0, 1);
+        line handR = line handR * (1 - line k) + global dKnob * line k;
+    } else if (global rTick - global cHand[c] <= 1) {
+        line handR = global dHandbrake;
+    }
+    line width = 4;
+    if (driverSlimOf(line uuid) == 1) {
+        line width = 3;
+    }
+    driverArm(line ids[2], global dShoulderR, line handR, line width, L, U, F);
+    driverArm(line ids[3], global dShoulderL, line handL, line width, L, U, F);
+}
+
+/** @dkeep: toggles leaving the model in the car on getting out (to look at
+ * it from outside); turning it off removes the models left behind. */
+function driverKeepToggle {
+    if (global dKeep == 1) {
+        global dKeep = 0;
+        select entitiesByName(global dKept as list[str]);
+        selectedEntity.remove();
+        select reset;
+        global dKept = [];
+        default.sendMessage(s"<gray>Driver models are removed on getting out again.");
+    } else {
+        global dKeep = 1;
+        default.sendMessage(s"<gray>Getting out now leaves the driver model in the car. <yellow>@dkeep</yellow> again clears them.");
+    }
+}

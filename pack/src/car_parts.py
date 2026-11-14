@@ -424,6 +424,8 @@ def cage():
     e.append(box((-0.68, 0.70, 0.62), (0.68, 0.90, 0.88), "plastic"))                    # dashboard
     e.append(box((-0.10, 0.34, 0.20), (0.10, 0.70, 0.62), "plastic"))                    # center console
     e.append(beam((0.0, 0.60, 0.05), (0.0, 0.78, 0.20), 0.025, 0.025, "darksteel"))      # handbrake
+    e.append(beam((0.0, 0.70, 0.40), (0.02, 0.85, 0.32), 0.022, 0.022, "darksteel"))     # gear lever
+    e.append(box((-0.015, 0.84, 0.29), (0.055, 0.89, 0.35), "accent"))                   # gear knob
     add(Part("cage", "Roll cage, seats, dash", "interior", "chassis", (0, 0, 0), 45, 300, "fail",
              "Protects the crew; at 0 HP the roof crush reaches the driver (car is wrecked)", damaged=False), e)
 
@@ -438,8 +440,8 @@ def steering_wheel():
     e.append(box((-0.17, -0.02, -0.015), (0.17, 0.02, 0.015), "darksteel"))               # spokes
     e.append(box((-0.02, -0.17, -0.015), (0.02, 0.0, 0.015), "darksteel"))
     e.append(box((-0.04, -0.04, -0.03), (0.04, 0.04, 0.03), "accent"))                   # hub
-    e.append(box((-0.02, -0.02, 0.03), (0.02, 0.02, 0.25), "darksteel"))                 # column
-    add(Part("steering_wheel", "Steering wheel", "interior", "cage", (0.33, 0.95, 0.45), 2, 40, "fail",
+    e.append(box((-0.02, -0.02, 0.03), (0.02, 0.02, 0.47), "darksteel"))                 # column (to the dash)
+    add(Part("steering_wheel", "Steering wheel", "interior", "cage", (0.33, 0.90, 0.24), 2, 40, "fail",
              "Cosmetic; turns with the front wheels", rest=(22.0, 0.0, 0.0), anim="spin_z", damaged=False),
         local_elems=e)
 

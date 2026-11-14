@@ -1,0 +1,17 @@
+{
+  "_doc": "Defines the 26.3 client compiles each overridden core shader with (RenderPipelines.java). Every combination of flags, each value choice, with and without the OIT stages and the device macros, is compiled by build_pack.py.",
+  "oit_base": {"OIT": "", "OIT_WAVELET_RANK": "2", "OIT_COEFF_COUNT": "8", "OIT_COEFF_ATTACHMENT_COUNT": "2"},
+  "oit_stages": {
+    "depth_bounds": {"OIT_ALPHA_ONLY": "", "OIT_DEPTH_BOUNDS": ""},
+    "transmittance": {"OIT_ALPHA_ONLY": "", "OIT_TRANSMITTANCE": ""},
+    "accumulate": {"OIT_ACCUMULATE": ""}
+  },
+  "device_macros": ["RENDERPEARL_DEPTH_IS_ZERO_TO_ONE", "RENDERPEARL_EXPLICIT_DEPTH_INVARIANCE"],
+  "shaders": {
+    "minecraft:core/entity": {
+      "flags": ["EMISSIVE", "NO_OVERLAY", "NO_CARDINAL_LIGHTING", "PER_FACE_LIGHTING", "GLINT", "APPLY_TEXTURE_MATRIX", "DISSOLVE"],
+      "values": {"ALPHA_CUTOUT": [null, "0.1"]},
+      "oit": true
+    }
+  }
+}
