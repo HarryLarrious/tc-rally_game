@@ -483,7 +483,8 @@ function mapStamp(x: num, z: num, r2: num, s: str) {
         line surf = "coarse_dirt";
         line half = "mud_brick_slab";
     } else if (s == "s") {
-        line surf = "snow_block";
+        // Snowy road: smooth quartz, so it stands out from the snow around.
+        line surf = "smooth_quartz";
         line half = "smooth_quartz_slab";
         line sub = "stone";
     } else if (s == "r") {

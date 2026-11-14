@@ -72,7 +72,14 @@ playerevent command {
     } else if (line cmd == "map") {
         mapCommand(line words);
     } else if (line cmd == "start") {
-        startCommand();
+        // @start [new | SEED]
+        if (line words.len() >= 2) {
+            startCommand(line words[2] as str);
+        } else {
+            startCommand();
+        }
+    } else if (line cmd == "gen") {
+        genCommand(line words);
     } else if (line cmd == "menu") {
         giveRoadbook();
         menuOpen();
@@ -91,7 +98,7 @@ playerevent command {
     } else if (line cmd == "pack") {
         packSend();
     } else {
-        default.sendMessage(s"<gray>Commands: <yellow>@menu</yellow>, <yellow>@start</yellow>, <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@map build|stop</yellow>, <yellow>@tp/@tpa/@tpr/@tpf/@look/@where</yellow>, <yellow>@spec/@fly/@walk</yellow>, <yellow>@track build|clear</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
+        default.sendMessage(s"<gray>Commands: <yellow>@menu</yellow>, <yellow>@start [new|SEED]</yellow>, <yellow>@gen</yellow>, <yellow>@car [turn]</yellow>, <yellow>@drive</yellow>, <yellow>@exit</yellow>, <yellow>@fix</yellow>, <yellow>@map build|stop</yellow>, <yellow>@tp/@tpa/@tpr/@tpf/@look/@where</yellow>, <yellow>@spec/@fly/@walk</yellow>, <yellow>@track build|clear</yellow>, <yellow>@damage</yellow>, <yellow>@hit PART AMOUNT</yellow>, <yellow>@tune</yellow>, <yellow>@part ID [turn]</yellow>, <yellow>@carcheck</yellow>, <yellow>@clearcars</yellow>, <yellow>@pack</yellow>.");
     }
 }
 

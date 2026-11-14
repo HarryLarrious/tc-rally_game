@@ -136,6 +136,7 @@ function carsTick {
                 line hand = 1;
             }
             carStep(line c, line fwd, line side, line hand);
+            gnTrack(line c);
             stageTick(line c);
             carHud(line c);
             engineSound(line c);
@@ -182,7 +183,12 @@ function carHud(c: num) {
     select playersByName(global cDriver[c]);
     line st = stageHud(c);
     if (line st != "") {
-        line st = "   SS1 %var(st)";
+        line sn = stageName();
+        line st = "   %var(sn) %var(st)";
+    }
+    // The builder is close behind: the road ahead is still being made.
+    if (gnLeadOf(c) < 25) {
+        line st = "%var(st)   BUILDING AHEAD";
     }
     if (global rTick - global cHand[c] <= 1) {
         selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray><gold>%var(st)</gold>   <red><b>HANDBRAKE</b></red>");

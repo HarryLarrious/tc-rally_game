@@ -1,0 +1,784 @@
+// Procedural stages. A seed plans a new rally stage: the road, the terrain
+// around it and the biome styles it runs through. tc/gen_build.tc builds it
+// a little ahead of the cars while they drive. The same seed always gives
+// the same stage, so players can race each other's seeds.
+//
+// Everything comes from gnHash(i, j, salt), a hash of whole numbers and the
+// seed, so any column's height or biome can be worked out on its own, in
+// any order.
+//
+// Terrain: a node every 16 blocks (gnNode) takes its height from a smooth
+// hill lattice (96 blocks) plus some roughness; columns are bilinear between
+// nodes (gnHeight). A second smooth lattice (160 blocks) picks the biome
+// among the 2 or 3 styles the seed chose (gnBioAt).
+// Road: 3-block steps through straights, sweepers, tight bends, hairpins and
+// chicanes. It steers away from the plot edges, the spawn and the road it
+// laid before; its height follows the smoothed ground, climbing at most half
+// a block per step (slabs give the half heights).
+// Cells: the 16 x 16 cells within two cells of the road, in the order the
+// road first needs them. The builder makes them in that order.
+
+/** The stage seed (0: none), a counter that changes with every new stage
+ * (stops the old stage's processes), the rng position, 1 once the stage is
+ * planned, and what the planner is doing. */
+declare global gnSeed: num;
+declare global gnId: num;
+declare global gnRng: num;
+declare global gnReady: num;
+declare global gnPhase: str;
+/** Road points 1..gnN: position, height in half blocks, heading (degrees,
+ * direction (cos, sin) in x and z), biome. */
+declare global gnX: list[num];
+declare global gnZ: list[num];
+declare global gnR2: list[num];
+declare global gnHd: list[num];
+declare global gnB: list[num];
+declare global gnN: num;
+/** Road points of the start and finish lines. */
+declare global gnStartK: num;
+declare global gnFinishK: num;
+/** Seed look: hill height, how much of the land stays flat (0..1), and
+ * roughness. */
+declare global gnAmp: num;
+declare global gnFlat: num;
+declare global gnRough: num;
+/** Biome styles (dicts) and the indices this seed uses. */
+declare global gnBio: list;
+declare global gnBioSet: list[num];
+/** Node height and biome value caches, "i j" -> value. */
+declare global gnNodeH: dict[num];
+declare global gnNodeV: dict[num];
+/** Planning: 16-block cell -> the road points in it (a list); 8-block
+ * cells near the road (no trees there). */
+declare global gnOcc: dict;
+declare global gnMask: dict[num];
+/** Cells to build ("ci cj"), the road point that first needs each, the
+ * set, and cells of older stages to wipe. */
+declare global gnCells: list[str];
+declare global gnNeed: list[num];
+declare global gnCellSet: dict[num];
+declare global gnWipe: list[str];
+/** Clearing before a build: cells wiped so far and how many. */
+declare global gnClearDone: num;
+declare global gnClearAll: num;
+/** Cells built on the plot: highest y used (for wiping) and the seed that
+ * built them (-1 while building). */
+declare saved gnBuilt: dict[num];
+declare saved gnBuiltBy: dict[num];
+/** The last seed played, and the best time and driver per seed. */
+declare saved gnLast: num;
+declare saved gnBest: dict[num];
+declare saved gnBestName: dict[str];
+
+// ---------------------------------------------------------------- hashing
+
+/** A number in 0..1 from whole numbers i, j, salt and the seed. */
+function gnHash(i: num, j: num, salt: num): num {
+    line h = (i * 1291 + j * 4513 + salt * 977 + global gnSeed * 131 + 7) % 65521;
+    line h = (line h * line h + 4071) % 65521;
+    line h = (line h * line h + 17) % 65521;
+    return line h / 65521;
+}
+
+/** The next seeded random number in 0..1. */
+function gnRand(): num {
+    global gnRng += 1;
+    return gnHash(global gnRng, 31, 5);
+}
+
+function gnRandIn(a: num, b: num): num {
+    return a + (b - a) * gnRand();
+}
+
+/** -1 or 1. */
+function gnSign(): num {
+    if (gnRand() < 0.5) {
+        return -1;
+    }
+    return 1;
+}
+
+/** Smooth value noise in 0..1: lattice points every `size` blocks. */
+function gnLattice(x: num, z: num, size: num, salt: num): num {
+    line fx = x / size;
+    line fz = z / size;
+    line i = num.floor(line fx);
+    line j = num.floor(line fz);
+    line tx = line fx - line i;
+    line tz = line fz - line j;
+    line sx = line tx * line tx * (3 - 2 * line tx);
+    line sz = line tz * line tz * (3 - 2 * line tz);
+    line a = gnHash(line i, line j, salt);
+    line b = gnHash(line i + 1, line j, salt);
+    line c = gnHash(line i, line j + 1, salt);
+    line d = gnHash(line i + 1, line j + 1, salt);
+    line ab = line a + (line b - line a) * line sx;
+    line cd = line c + (line d - line c) * line sx;
+    return line ab + (line cd - line ab) * line sz;
+}
+
+// ---------------------------------------------------------------- biomes
+
+/** The biome styles. top/soil: ground blocks; verge: the road's shoulders;
+ * road: road surface code (mapStamp); amp: hill height factor; trees,
+ * plants (a "+" marks a two-block plant) and how many per cell; rockN:
+ * boulders per cell. */
+function gnBiomes {
+    global gnBio = [
+        {name: "Meadow", top: "grass_block", soil: "dirt", verge: "grass_block", road: "g", amp: 0.6,
+            trees: ["Oak Tree", "Oak Tree", "Birch Tree", "Oak Tree"], treeN: 0.8,
+            plants: ["short_grass", "short_grass", "short_grass", "short_grass", "tall_grass+", "dandelion", "poppy", "cornflower", "oxeye_daisy", "azure_bluet"], plantN: 12, rockN: 0.1},
+        {name: "Woods", top: "grass_block", soil: "dirt", verge: "coarse_dirt", road: "d", amp: 0.8,
+            trees: ["Oak Tree", "Birch Tree", "Birch Tree", "Tall Birch Tree", "Oak Tree", "Dark Oak Tree"], treeN: 4,
+            plants: ["short_grass", "short_grass", "fern", "bush", "leaf_litter", "lily_of_the_valley"], plantN: 9, rockN: 0.3},
+        {name: "Pines", top: "podzol", soil: "dirt", verge: "grass_block", road: "g", amp: 1.0,
+            trees: ["Spruce Tree", "Spruce Tree", "Slightly Taller Spruce Tree"], treeN: 4.5,
+            plants: ["fern", "fern", "short_grass", "large_fern+", "sweet_berries"], plantN: 7, rockN: 0.6},
+        {name: "Alpine", top: "snow_block", soil: "stone", verge: "snow_block", road: "s", amp: 1.6,
+            trees: ["Spruce Tree", "Slightly Taller Spruce Tree"], treeN: 1,
+            plants: [], plantN: 0, rockN: 1.2},
+        {name: "Canyon", top: "red_sand", soil: "terracotta", verge: "coarse_dirt", road: "c", amp: 1.3,
+            trees: [], treeN: 0,
+            plants: ["dead_bush", "short_dry_grass", "short_dry_grass"], plantN: 6, rockN: 0}
+    ];
+}
+
+/** Index into gnBio for biome value v (0..1). */
+function gnBioIdx(v: num): num {
+    line n = global gnBioSet.len();
+    return global gnBioSet[num.min(line n, num.floor(v * line n) + 1)];
+}
+
+/** The biome style dict at index b. */
+function gnBioDict(b: num): dict {
+    return global gnBio[b] as dict;
+}
+
+// ---------------------------------------------------------------- terrain
+
+/** Biome value of node (i, j), stretched so every chosen style shows up. */
+function gnNodeBio(i: num, j: num): num {
+    line key = "%var(i) %var(j)";
+    if (global gnNodeV.hasKeys(line key)) {
+        return global gnNodeV[line key];
+    }
+    line v = gnLattice(i * 16, j * 16, 160, 2);
+    line v = num.clamp((line v - 0.5) * 2.2 + 0.5, 0, 0.999);
+    global gnNodeV[line key] = line v;
+    return line v;
+}
+
+/** Ground height of node (i, j), at block (16 i, 16 j). */
+function gnNode(i: num, j: num): num {
+    line key = "%var(i) %var(j)";
+    if (global gnNodeH.hasKeys(line key)) {
+        return global gnNodeH[line key];
+    }
+    line a = gnLattice(i * 16, j * 16, 96, 1);
+    line t = num.clamp((line a - global gnFlat) / (1 - global gnFlat), 0, 1);
+    line t = line t * line t * (3 - 2 * line t);
+    line bio = gnBioDict(gnBioIdx(gnNodeBio(i, j)));
+    line amp = global gnAmp * (line bio["amp"] as num);
+    line r = gnHash(i, j, 3) - 0.5;
+    line h = num.max(49, 49 + line t * line amp + line r * global gnRough * (0.25 + line t));
+    global gnNodeH[line key] = line h;
+    return line h;
+}
+
+/** Ground height (the top block's y) of column (x, z). */
+function gnHeight(x: num, z: num): num {
+    line i = num.floor(x / 16);
+    line j = num.floor(z / 16);
+    line u = (x - line i * 16) / 16;
+    line v = (z - line j * 16) / 16;
+    line a = gnNode(line i, line j);
+    line b = gnNode(line i + 1, line j);
+    line c = gnNode(line i, line j + 1);
+    line d = gnNode(line i + 1, line j + 1);
+    line l = line a + (line c - line a) * line v;
+    line r = line b + (line d - line b) * line v;
+    return num.floor(line l + (line r - line l) * line u + 0.5);
+}
+
+/** Biome index of column (x, z). */
+function gnBioAt(x: num, z: num): num {
+    line i = num.floor(x / 16);
+    line j = num.floor(z / 16);
+    line u = (x - line i * 16) / 16;
+    line v = (z - line j * 16) / 16;
+    line a = gnNodeBio(line i, line j);
+    line b = gnNodeBio(line i + 1, line j);
+    line c = gnNodeBio(line i, line j + 1);
+    line d = gnNodeBio(line i + 1, line j + 1);
+    line l = line a + (line c - line a) * line v;
+    line r = line b + (line d - line b) * line v;
+    return gnBioIdx(line l + (line r - line l) * line u);
+}
+
+// ---------------------------------------------------------------- road
+
+/** 1 when (x, z) is outside the plot's margin or near the spawn. */
+function gnOut(x: num, z: num): num {
+    if (x < 56 || x > 944 || z < 56 || z > 944) {
+        return 1;
+    }
+    if (x > 520 && x < 680 && z > 860) {
+        return 1;
+    }
+    return 0;
+}
+
+/** 1 when (x, z) is within `dist` blocks of a road point laid before point
+ * k - gap. */
+function gnClash(x: num, z: num, k: num, gap: num, dist: num): num {
+    line ci = num.floor(x / 16);
+    line cj = num.floor(z / 16);
+    line d2 = dist * dist;
+    repeat (line di to 3) {
+        repeat (line dj to 3) {
+            line a = line ci + line di - 2;
+            line b = line cj + line dj - 2;
+            line key = "%var(a) %var(b)";
+            if (global gnOcc.hasKeys(line key)) {
+                for (line i of global gnOcc[line key] as list) {
+                    if ((line i as num) < k - gap) {
+                        line ex = x - global gnX[line i as num];
+                        line ez = z - global gnZ[line i as num];
+                        if (line ex * line ex + line ez * line ez < line d2) {
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+/** Look-ahead: 1 when a point about to come up is outside the margin or
+ * within 26 blocks of road laid before point k - 45 (a hairpin's two legs
+ * may run side by side for a while). */
+function gnBlocked(x: num, z: num, k: num): num {
+    if (gnOut(x, z) == 1) {
+        return 1;
+    }
+    return gnClash(x, z, k, 45, 26);
+}
+
+/** The hard rule for the next two steps from (x, z) heading hd and turning
+ * kap per step: inside the margin and at least 16 blocks from any road
+ * before the last 8 points, so the road never touches itself. 1 = free. */
+function gnStepFree(x: num, z: num, hd: num, kap: num, k: num): num {
+    line h1 = hd + kap;
+    line x1 = x + num.cos(line h1) * 3;
+    line z1 = z + num.sin(line h1) * 3;
+    if (gnOut(line x1, line z1) == 1 || gnClash(line x1, line z1, k + 1, 8, 16) == 1) {
+        return 0;
+    }
+    line h2 = line h1 + kap;
+    line x2 = line x1 + num.cos(line h2) * 3;
+    line z2 = line z1 + num.sin(line h2) * 3;
+    if (gnOut(line x2, line z2) == 1 || gnClash(line x2, line z2, k + 2, 8, 16) == 1) {
+        return 0;
+    }
+    return 1;
+}
+
+/** Drops the road points after point m (and their cell entries). */
+function gnBack(m: num) {
+    while (global gnX.len() > m) {
+        line n = global gnX.len();
+        line ci = num.floor(global gnX[line n] / 16);
+        line cj = num.floor(global gnZ[line n] / 16);
+        line key = "%var(ci) %var(cj)";
+        if (global gnOcc.hasKeys(line key)) {
+            line here = global gnOcc[line key] as list;
+            if (line here.len() > 0) {
+                line here.remove(line here.len());
+            }
+            global gnOcc[line key] = line here;
+        }
+        global gnX.remove(line n);
+        global gnZ.remove(line n);
+        global gnHd.remove(line n);
+    }
+}
+
+/** Lays the road's points (gnX, gnZ, gnHd); returns how many. */
+function gnRoadWalk(): num {
+    global gnX = [];
+    global gnZ = [];
+    global gnHd = [];
+    global gnOcc = {};
+    line goal = num.floor(gnRandIn(700, 1050));
+    // A start in the inner plot, along an axis toward the middle.
+    line x = gnRandIn(200, 800);
+    line z = gnRandIn(200, 760);
+    line hd = 0;
+    if (num.abs(line x - 500) > num.abs(line z - 500)) {
+        if (line x > 500) {
+            line hd = 180;
+        }
+    } else {
+        line hd = 90;
+        if (line z > 500) {
+            line hd = 270;
+        }
+    }
+    line kap = 0;
+    line tgt = 0;
+    line left = 20;
+    line hold = 20;
+    line flip = 0;
+    line stuck = 0;
+    line backs = 0;
+    line k = 0;
+    while (line k < line goal) {
+        line dead = 0;
+        if (line left <= 0) {
+            // A new piece of road.
+            line s = gnSign();
+            if (line flip != 0) {
+                line s = line flip;
+                line flip = 0;
+            }
+            line r = gnRand();
+            if (line r < 0.26) {
+                line tgt = 0;
+                line left = num.floor(gnRandIn(12, 34));
+            } else if (line r < 0.58) {
+                line tgt = line s * gnRandIn(1.5, 4);
+                line left = num.floor(gnRandIn(10, 26));
+            } else if (line r < 0.82) {
+                line tgt = line s * gnRandIn(5, 9);
+                line left = num.floor(gnRandIn(50, 110) / num.abs(line tgt));
+            } else if (line r < 0.92) {
+                // Hairpin.
+                line tgt = line s * 13;
+                line left = num.floor(gnRandIn(150, 175) / 13) + 2;
+            } else {
+                // Chicane: a tight bend, then the same the other way.
+                line tgt = line s * 8;
+                line left = 5;
+                line flip = 0 - line s;
+            }
+        }
+        if (line k > line goal - 14) {
+            line tgt = 0;
+        }
+        // Look ahead: turn away from edges, the spawn and old road.
+        if (line hold <= 0) {
+            line a1 = line hd + line kap * 6;
+            if (gnBlocked(line x + num.cos(line a1) * 21, line z + num.sin(line a1) * 21, line k) == 1 || gnBlocked(line x + num.cos(line a1) * 42, line z + num.sin(line a1) * 42, line k) == 1) {
+                line xl = line x + num.cos(line hd - 55) * 36;
+                line zl = line z + num.sin(line hd - 55) * 36;
+                line xr = line x + num.cos(line hd + 55) * 36;
+                line zr = line z + num.sin(line hd + 55) * 36;
+                line bl = gnBlocked(line xl, line zl, line k);
+                line br = gnBlocked(line xr, line zr, line k);
+                if (line bl == 1 && line br == 1) {
+                    line stuck += 1;
+                    if (line stuck > 12) {
+                        line dead = 1;
+                    }
+                    if (line kap >= 0) {
+                        line tgt = 12;
+                    } else {
+                        line tgt = -12;
+                    }
+                } else {
+                    line stuck = 0;
+                    line s = 1;
+                    if (line br == 1) {
+                        line s = -1;
+                    } else if (line bl == 0) {
+                        // Both free: the more level side.
+                        line h0 = gnHeight(line x, line z);
+                        if (num.abs(gnHeight(line xl, line zl) - line h0) < num.abs(gnHeight(line xr, line zr) - line h0)) {
+                            line s = -1;
+                        }
+                    }
+                    line tgt = line s * 9;
+                }
+                line left = 5;
+                line hold = 5;
+                line flip = 0;
+            }
+        }
+        line hold -= 1;
+        line kap = line kap + num.clamp(line tgt - line kap, -2, 2);
+        // Never onto or beside earlier road: try the planned turn, then
+        // harder turns either way.
+        if (line dead == 0 && gnStepFree(line x, line z, line hd, line kap, line k) == 0) {
+            line found = 0;
+            for (line dk of [4, -4, 8, -8, 14, -14]) {
+                if (line found == 0) {
+                    line kk = num.clamp(line kap + (line dk as num), -14, 14);
+                    if (gnStepFree(line x, line z, line hd, line kk, line k) == 1) {
+                        line found = 1;
+                        line kap = line kk;
+                    }
+                }
+            }
+            if (line found == 0) {
+                line dead = 1;
+            } else {
+                line tgt = line kap;
+                line left = 4;
+                line hold = 4;
+                line flip = 0;
+            }
+        }
+        if (line dead == 1) {
+            // A dead end: back up 25 points and turn the other way (up to
+            // 10 times), else the road ends here.
+            if (line backs >= 10 || line k <= 40) {
+                break;
+            }
+            line m = num.max(1, line k - 25);
+            line turned = global gnHd[line k] - global gnHd[line m];
+            gnBack(line m);
+            line k = line m;
+            line x = global gnX[line m];
+            line z = global gnZ[line m];
+            line hd = global gnHd[line m];
+            line kap = 0;
+            line tgt = 12;
+            if (line turned > 0) {
+                line tgt = -12;
+            }
+            line left = 8;
+            line hold = 8;
+            line flip = 0;
+            line stuck = 0;
+            line backs += 1;
+            continue;
+        }
+        line hd += line kap;
+        line x += num.cos(line hd) * 3;
+        line z += num.sin(line hd) * 3;
+        line k += 1;
+        line left -= 1;
+        global gnX.append(line x);
+        global gnZ.append(line z);
+        global gnHd.append(line hd);
+        line ci = num.floor(line x / 16);
+        line cj = num.floor(line z / 16);
+        line key = "%var(ci) %var(cj)";
+        line here = [];
+        if (global gnOcc.hasKeys(line key)) {
+            line here = global gnOcc[line key] as list;
+        }
+        line here.append(line k);
+        global gnOcc[line key] = line here;
+        if (line k % 40 == 0) {
+            wait;
+        }
+    }
+    return line k;
+}
+
+/** Road heights (gnR2) and biomes (gnB): the ground under the road,
+ * averaged over 11 points twice, then limited to half a block per step. */
+function gnRoadHeights {
+    line n = global gnN;
+    line g = [];
+    global gnB = [];
+    repeat (line k to line n) {
+        line g.append(gnHeight(global gnX[line k], global gnZ[line k]));
+        global gnB.append(gnBioAt(global gnX[line k], global gnZ[line k]));
+        if (line k % 50 == 0) {
+            wait;
+        }
+    }
+    repeat (2) {
+        line s = [];
+        repeat (line k to line n) {
+            line a = num.max(1, line k - 5);
+            line b = num.min(line n, line k + 5);
+            line sum = 0;
+            line i = line a;
+            while (line i <= line b) {
+                line sum += line g[line i] as num;
+                line i += 1;
+            }
+            line s.append(line sum / (line b - line a + 1));
+        }
+        line g = line s;
+        wait;
+    }
+    global gnR2 = [];
+    line prev = num.max(98, num.round((line g[1] as num) * 2));
+    repeat (line k to line n) {
+        line r2 = num.max(98, num.round((line g[line k] as num) * 2));
+        line r2 = num.clamp(line r2, line prev - 1, line prev + 1);
+        global gnR2.append(line r2);
+        line prev = line r2;
+    }
+    // Whole blocks around the start and finish lines (the gantries draw a
+    // line on the road).
+    for (line c of [global gnStartK, global gnFinishK]) {
+        line i = num.max(1, (line c as num) - 3);
+        while (line i <= num.min(line n, (line c as num) + 3)) {
+            global gnR2[line i] = num.floor((global gnR2[line i]) / 2) * 2;
+            line i += 1;
+        }
+    }
+}
+
+/** The cells to build, in the order the road first needs them, the
+ * no-tree mask along the road, and the old cells to wipe. */
+function gnCellsPlan {
+    global gnCells = [];
+    global gnNeed = [];
+    global gnCellSet = {};
+    global gnMask = {};
+    line k = 1;
+    while (line k <= global gnN) {
+        line x = global gnX[line k];
+        line z = global gnZ[line k];
+        line ci = num.floor(line x / 16);
+        line cj = num.floor(line z / 16);
+        repeat (line di to 5) {
+            repeat (line dj to 5) {
+                // A 5 x 5 square without its corners.
+                if (num.abs(line di - 3) + num.abs(line dj - 3) < 4) {
+                    line a = line ci + line di - 3;
+                    line b = line cj + line dj - 3;
+                    line key = "%var(a) %var(b)";
+                    if (line a >= 0 && line b >= 0 && line a <= 62 && line b <= 62 && !global gnCellSet.hasKeys(line key)) {
+                        // Never under the spawn.
+                        if (!(line a >= 35 && line a <= 39 && line b >= 58)) {
+                            global gnCellSet[line key] = 1;
+                            global gnCells.append(line key);
+                            global gnNeed.append(line k);
+                        }
+                    }
+                }
+            }
+        }
+        line mx = num.floor(line x / 8);
+        line mz = num.floor(line z / 8);
+        repeat (line di to 3) {
+            repeat (line dj to 3) {
+                line a = line mx + line di - 2;
+                line b = line mz + line dj - 2;
+                global gnMask["%var(a) %var(b)"] = 1;
+            }
+        }
+        line k += 2;
+        if (line k % 40 == 1) {
+            wait;
+        }
+    }
+    // Everything older stages built (or left half built) goes first.
+    global gnWipe = [];
+    for (line key, line top of saved gnBuilt) {
+        if (!saved gnBuiltBy.hasKeys(line key)) {
+            global gnWipe.append(line key);
+        } else if (saved gnBuiltBy[line key] != global gnSeed) {
+            global gnWipe.append(line key);
+        }
+    }
+}
+
+/** Wipes every cell in gnWipe before the new stage is built, so nothing
+ * of an older stage is left around it. Returns 0 when a newer stage took
+ * over. */
+function gnClearOld(myId: num): num {
+    global gnClearDone = 0;
+    global gnClearAll = global gnWipe.len();
+    if (global gnRate == 0) {
+        global gnRate = 60;
+    }
+    while (global gnWipe.len() > 0) {
+        if (global gnId != myId) {
+            return 0;
+        }
+        gnWipeCell(global gnWipe[1], 1);
+        global gnWipe.remove(1);
+        global gnClearDone += 1;
+        gnPace();
+    }
+    return 1;
+}
+
+// ---------------------------------------------------------------- stage
+
+/** Plans the stage of global gnSeed, then starts the builder. */
+process gnPlan {
+    line myId = global gnId;
+    global gnRng = 0;
+    global gnNodeH = {};
+    global gnNodeV = {};
+    gnBiomes();
+    // This seed's look.
+    global gnAmp = gnRandIn(10, 26);
+    global gnFlat = gnRandIn(0.3, 0.55);
+    global gnRough = gnRandIn(1, 4);
+    line all = [1, 2, 3, 4, 5];
+    global gnBioSet = [];
+    repeat (2 + num.floor(gnRand() * 2)) {
+        line i = num.min(line all.len(), num.floor(gnRand() * line all.len()) + 1);
+        global gnBioSet.append(line all[line i]);
+        line all.remove(line i);
+    }
+    // The road: try again from a new start while it comes out short.
+    global gnPhase = "road";
+    line n = 0;
+    repeat (6) {
+        line n = gnRoadWalk();
+        if (global gnId != line myId) {
+            return;
+        }
+        if (line n >= 300) {
+            break;
+        }
+    }
+    global gnN = line n;
+    global gnStartK = 8;
+    global gnFinishK = line n - 10;
+    global gnPhase = "heights";
+    gnRoadHeights();
+    if (global gnId != line myId) {
+        return;
+    }
+    global gnPhase = "cells";
+    gnCellsPlan();
+    if (global gnId != line myId) {
+        return;
+    }
+    global gnPhase = "clearing";
+    if (gnClearOld(line myId) == 0) {
+        return;
+    }
+    global stPts = gnCheckpoints();
+    global gnReady = 1;
+    global gnPhase = "build";
+    start gnBuilder;
+}
+
+/** Throws away the current stage and plans the one of `seed`. */
+function gnNewStage(seed: num) {
+    global gnId += 1;
+    global gnSeed = seed;
+    saved gnLast = seed;
+    global gnReady = 0;
+    global gnPhase = "start";
+    global gnN = 0;
+    gnBuildReset();
+    start gnPlan;
+}
+
+/** The stage's checkpoints: start line, three splits, finish line. */
+function gnCheckpoints(): list {
+    line out = [];
+    line s = global gnStartK;
+    line f = global gnFinishK;
+    repeat (line i to 5) {
+        line k = line s + num.round((line f - line s) * (line i - 1) / 4);
+        line out.append(vec(global gnX[line k], global gnR2[line k] / 2 + 1, global gnZ[line k]));
+    }
+    return line out;
+}
+
+/** Where a car starts: road point 2, facing along the road. */
+function gnStartLoc(): loc {
+    return loc(global gnX[2], global gnR2[2] / 2 + 1, global gnZ[2], 0, global gnHd[2] - 90);
+}
+
+/** Names of this seed's biome styles, "Pines, Alpine". */
+function gnBioNames(): str {
+    line out = "";
+    for (line b of global gnBioSet) {
+        line name = gnBioDict(line b as num)["name"] as str;
+        if (line out == "") {
+            line out = line name;
+        } else {
+            line out = "%var(out), %var(name)";
+        }
+    }
+    return line out;
+}
+
+/** "m:ss.s by Name" for the seed's best time, or "". */
+function gnBestText(seed: num): str {
+    line key = "%var(seed)";
+    if (!saved gnBest.hasKeys(line key)) {
+        return "";
+    }
+    line t = stageTime(saved gnBest[line key]);
+    line who = saved gnBestName[line key];
+    return "%var(t) by %var(who)";
+}
+
+/** Keeps the best time t (seconds) for the current seed; 1 when it is a
+ * new record. */
+function gnRecord(name: str, t: num): num {
+    line seed = global gnSeed;
+    line key = "%var(seed)";
+    if (saved gnBest.hasKeys(line key)) {
+        if (saved gnBest[line key] <= t) {
+            return 0;
+        }
+    }
+    saved gnBest[line key] = t;
+    saved gnBestName[line key] = name;
+    return 1;
+}
+
+// ---------------------------------------------------------------- command
+
+/** @gen: the stage's state. @gen rate N: build work per tick. @gen lead N:
+ * road points kept built ahead of drivers. @gen wipe: clears every cell
+ * any stage built (no stage after it until @start). */
+function genCommand(words: list) {
+    line sub = "";
+    if (words.len() >= 2) {
+        line sub = words[2] as str;
+    }
+    if (line sub == "rate" && words.len() >= 3) {
+        global gnRate = num.max(5, num.parse(words[3] as str));
+    } else if (line sub == "lead" && words.len() >= 3) {
+        global gnLead = num.max(20, num.parse(words[3] as str));
+    } else if (line sub == "wipe") {
+        if (stageOthersRunning("") == 1) {
+            default.sendMessage(s"<gray>Not while someone drives the stage.");
+            return;
+        }
+        global gnId += 1;
+        global gnSeed = 0;
+        global gnReady = 0;
+        gnBuildReset();
+        global gnWipe = [];
+        for (line key, line top of saved gnBuilt) {
+            global gnWipe.append(line key);
+        }
+        start gnWiper;
+        return;
+    }
+    line seed = global gnSeed;
+    line n = global gnN;
+    line s = global gnSDone;
+    line ptr = global gnPtr - 1;
+    line nc = global gnCells.len();
+    line nw = global gnWipe.len();
+    line rate = global gnRate;
+    line lead = global gnLead;
+    line front = global gnFront;
+    line ph = global gnPhase;
+    line names = gnBioNames();
+    line cpu = num.round(game.cpuUsage);
+    default.sendMessage(s"<gray>Stage <yellow>#%var(seed)</yellow> (%var(ph)) %var(names): road %var(s)/%var(n), cells %var(ptr)/%var(nc), wipes left %var(nw), driver at %var(front); rate %var(rate), lead %var(lead), CPU %var(cpu)%");
+}
+
+/** Wipes the cells in gnWipe (after @gen wipe). */
+process gnWiper {
+    line myId = global gnId;
+    while (global gnWipe.len() > 0 && global gnId == line myId) {
+        gnWipeCell(global gnWipe[1], 1);
+        global gnWipe.remove(1);
+        gnPace();
+    }
+    allPlayers.sendMessage(s"<gray>Stage cells wiped.");
+}

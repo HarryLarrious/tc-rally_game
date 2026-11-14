@@ -178,16 +178,25 @@ function menuBuild(st: dict): list {
     line out.append(menuButton(st, "arms_slim", 0.95, 0.12, 0.8, 0.2, "SLIM", 0.45, "arms slim"));
     // Divider.
     line out.append({kind: "deco", ent: menuRect(st, 0, 0.0, 2.9, 0.012, "#3A3F47", 100, 0.02)});
-    // The stage.
-    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.2, "SS1 KESTREL RIDGE", "label", 0.5)});
-    line best = "No time set yet";
-    if (saved stBest > 0) {
-        line bt = stageTime(saved stBest);
-        line who = saved stBestName;
-        line best = "Best %var(bt)  by %var(who)";
+    // The stage: the current procedural stage (or the last one played).
+    line seed = global gnSeed;
+    if (line seed == 0) {
+        line seed = saved gnLast;
     }
-    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.38, line best, "body", 0.38)});
-    line out.append(menuButton(st, "start", 0.95, -0.29, 1.0, 0.3, "START STAGE", 0.45, "start"));
+    line title = "NEW STAGE";
+    line sub = "A new stage from a random seed";
+    if (line seed > 0) {
+        line title = "STAGE #%var(seed)";
+        line sub = "No time set yet";
+        line best = gnBestText(line seed);
+        if (line best != "") {
+            line sub = "Best %var(best)";
+        }
+    }
+    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.2, line title, "label", 0.5)});
+    line out.append({kind: "deco", ent: menuText(st, -0.75, -0.38, line sub, "body", 0.36)});
+    line out.append(menuButton(st, "start", 0.95, -0.17, 1.0, 0.2, "DRIVE STAGE", 0.42, "start"));
+    line out.append(menuButton(st, "new", 0.95, -0.41, 1.0, 0.2, "NEW STAGE", 0.42, "new"));
     // Bottom row and hint.
     line out.append(menuButton(st, "car", -0.95, -0.66, 1.0, 0.22, "SPAWN CAR", 0.42, "car"));
     line out.append(menuButton(st, "close", 0.95, -0.66, 1.0, 0.22, "CLOSE", 0.42, "close"));
@@ -389,6 +398,9 @@ function menuAction(action: str) {
     } else if (action == "start") {
         menuClose();
         startCommand();
+    } else if (action == "new") {
+        menuClose();
+        startCommand("new");
     } else if (action == "car") {
         menuClose();
         spawnCarHere(0);

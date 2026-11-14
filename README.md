@@ -46,7 +46,8 @@ the way the 26.3 client does, once per define set the game uses for it
 | Command | Effect |
 | --- | --- |
 | `@menu` | Open the service board (also: right click the Roadbook in hotbar slot 1) |
-| `@start` | Put a car before the stage start line with you in it; the clock runs from the start line to the finish |
+| `@start [new \| SEED]` | Put a car before the start line of the procedural stage with you in it (the current one; `new` for a random seed, or a seed number); the clock runs from the start line to the finish |
+| `@gen [rate N \| lead N \| wipe]` | Stage builder state; work per tick (default 60); road points kept built ahead of drivers (default 110); wipe every cell stages built |
 | `@map build [X0 Z0 X1 Z1]` | Build the whole map (or only that plot-space area); `@map terrain\|road\|structs\|props\|decor\|wipe [area]` builds one phase, `@map stop` stops |
 | `@tp X Y Z [YAW [PITCH]]` | Teleport in plot space (what the code uses: x and z from the plot corner) |
 | `@tpa X Y Z [YAW [PITCH]]` | Teleport to absolute (F3) coordinates; `@origin X Y Z` with your F3 position sets the plot origin first |
@@ -70,6 +71,46 @@ the way the 26.3 client does, once per define set the game uses for it
 | `@carcheck` | List the newest car's parts that have no display |
 | `@clearcars` | Remove every car |
 | `@pack` | Send the resource pack again |
+
+## Procedural stages
+
+`@start` (or DRIVE STAGE / NEW STAGE on the service board) drives a stage
+made from a seed (`tc/gen.tc`). The same seed always gives the same stage,
+so players can race each other's seeds; the best time is kept per seed.
+Each seed picks its hill height, how much of the land is flat, and two or
+three biome styles: Meadow, Woods, Pines, Alpine (snow and stone, gravel
+roads go to snow) and Canyon (red sand and terracotta bands).
+
+Everything comes from a hash of whole numbers and the seed, so any
+column's height or biome can be worked out on its own, in any order.
+Terrain heights sit on a node every 16 blocks (a smooth 96-block hill
+lattice plus roughness) with bilinear columns in between; a 160-block
+lattice picks the biome. The road is laid in 3-block steps through
+straights, sweepers, tight bends, hairpins and chicanes, 2.1 to 3.2 km
+long; it looks 21 and 42 blocks ahead and turns away from the plot edges,
+the spawn and road it laid earlier. No step may land within 16 blocks of
+earlier road (other than the last 8 points), so it never touches itself;
+at a dead end it backs up 25 points and turns the other way (up to 10
+times). Snowy roads are smooth quartz, so they stand out from the snow. Its height follows the ground
+averaged over 33 blocks and climbs at most half a block per step.
+
+The builder (`tc/gen_build.tc`) works only near the road: the 16 x 16
+cells within about two cells of it, in the order the road reaches them.
+Planning and the first 150 blocks take about 15 seconds; after that it
+keeps the road built 110 points (330 blocks) ahead of the furthest driver,
+and the HUD shows BUILDING AHEAD if a car catches up. A cell is filled in
+runs of equal height and biome that grow from row to row, so flat ground
+costs one fill. Then come trees, plants and boulders, the road's 13-block
+shoulders, the 7-block road, marker posts and hay on bends, chevron boards
+before tight bends, the start and finish gantries and a hay wall at the
+end of the road. Before a new stage is built, every cell an older stage built is wiped back
+to plain grass (`Clearing the old stage` on the action bar); the built
+cells are kept in saved variables, so this works after a restart too.
+A new seed can't start while someone else is on a timed run.
+
+Beyond the cells the plot stays flat grass at y 49. The static Kestrel
+Ridge map below is still in the code (`@map build`), but stages and the
+static map use the same ground, so build only one of them on a plot.
 
 ## The map
 

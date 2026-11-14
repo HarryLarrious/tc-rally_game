@@ -1,0 +1,501 @@
+// Building a procedural stage (tc/gen.tc) while it is driven.
+//
+// The builder keeps the road built gnLead points (3 blocks each) ahead of
+// the furthest driver, and the first gnPre points before anyone starts.
+// For each few road points it first builds the terrain cells the road needs
+// up to 15 points further on, then the road's shoulders (verges), and
+// three points behind them the road itself, posts, hay bales, chevrons and
+// the start and finish gantries. A verge covers 6 blocks around its point,
+// so the road waits until the next verges are down. With time to spare it
+// wipes the cells of older stages.
+//
+// A cell is filled row by row in runs of equal height and biome; a run that
+// repeats on the next row grows instead of starting a new fill, so flat
+// ground costs one fill per cell (or none on plain grass at y 49). Hills
+// are solid down to y 50: hollow ones would leave dark caves the server
+// must light. Trees stay 3 blocks inside their cell, so wiping a cell (and
+// 3 blocks past it) removes them whole.
+
+/** Next cell to build, verges and road done up to these points, and the
+ * furthest point a driver has reached. */
+declare global gnPtr: num;
+declare global gnVDone: num;
+declare global gnSDone: num;
+declare global gnFront: num;
+/** Per car ("c"): the road point it is nearest. */
+declare global gnCarK: dict[num];
+/** Pacing: work this tick and the work allowed per tick (@gen rate). */
+declare global gnOps: num;
+declare global gnRate: num;
+/** Road points to keep built ahead of drivers, and before a start. */
+declare global gnLead: num;
+declare global gnPre: num;
+/** Text displays over the gantries. */
+declare global gnTexts: list;
+
+/** Forgets the build progress (a new stage). */
+function gnBuildReset {
+    global gnPtr = 1;
+    global gnVDone = 0;
+    global gnSDone = 0;
+    global gnFront = 0;
+    global gnCarK = {};
+    global gnOps = 0;
+    if (global gnRate == 0) {
+        global gnRate = 60;
+    }
+    if (global gnLead == 0) {
+        global gnLead = 110;
+    }
+    if (global gnPre == 0) {
+        global gnPre = 50;
+    }
+    if (global gnTexts.len() > 0) {
+        select entitiesByName(global gnTexts as list[str]);
+        selectedEntity.remove();
+        select reset;
+    }
+    global gnTexts = [];
+}
+
+/** Waits when this tick's work is used up, and while the CPU is high. */
+function gnPace {
+    if (global gnOps < global gnRate) {
+        return;
+    }
+    line ticks = num.ceil(global gnOps / global gnRate);
+    global gnOps = 0;
+    wait(line ticks);
+    while (game.cpuUsage > 75) {
+        wait(5);
+    }
+}
+
+process gnBuilder {
+    line myId = global gnId;
+    repeat {
+        if (global gnId != line myId) {
+            break;
+        }
+        line target = num.max(global gnPre, global gnFront + global gnLead);
+        if (global gnSDone < global gnN && global gnSDone < line target) {
+            line m = num.min(global gnN, global gnVDone + 4);
+            // Terrain up to 15 points past m.
+            while (global gnPtr <= global gnCells.len()) {
+                if (global gnNeed[global gnPtr] > line m + 15) {
+                    break;
+                }
+                gnBuildCell(global gnCells[global gnPtr]);
+                global gnPtr += 1;
+                gnPace();
+                if (global gnId != line myId) {
+                    return;
+                }
+            }
+            // Verges up to m, the road three points behind them.
+            while (global gnVDone < line m) {
+                global gnVDone += 1;
+                if (global gnVDone % 2 == 1 || global gnVDone == global gnN) {
+                    gnVerge(global gnVDone);
+                }
+            }
+            line sTo = line m - 3;
+            if (line m >= global gnN) {
+                line sTo = global gnN;
+            }
+            while (global gnSDone < line sTo) {
+                global gnSDone += 1;
+                gnRoad(global gnSDone);
+            }
+            gnPace();
+        } else if (global gnWipe.len() > 0) {
+            gnWipeCell(global gnWipe[1], 1);
+            global gnWipe.remove(1);
+            gnPace();
+        } else {
+            wait(10);
+        }
+    }
+}
+
+// ---------------------------------------------------------------- cells
+
+/** Builds cell "ci cj": terrain, then trees, plants and boulders. */
+function gnBuildCell(key: str) {
+    if (saved gnBuiltBy.hasKeys(key)) {
+        if (saved gnBuiltBy[key] == global gnSeed) {
+            return;
+        }
+    }
+    line p = key.split(" ");
+    line ci = num.parse(line p[1] as str);
+    line cj = num.parse(line p[2] as str);
+    line x0 = line ci * 16;
+    line z0 = line cj * 16;
+    line x1 = num.min(line x0 + 15, 1000);
+    line z1 = num.min(line z0 + 15, 1000);
+    line h00 = gnNode(line ci, line cj);
+    line h10 = gnNode(line ci + 1, line cj);
+    line h01 = gnNode(line ci, line cj + 1);
+    line h11 = gnNode(line ci + 1, line cj + 1);
+    line v00 = gnNodeBio(line ci, line cj);
+    line v10 = gnNodeBio(line ci + 1, line cj);
+    line v01 = gnNodeBio(line ci, line cj + 1);
+    line v11 = gnNodeBio(line ci + 1, line cj + 1);
+    if (saved gnBuilt.hasKeys(key)) {
+        gnWipeCell(key, 0);
+    }
+    saved gnBuilt[key] = num.max(num.max(line h00, line h10), num.max(line h01, line h11)) + 34;
+    saved gnBuiltBy[key] = -1;
+    line w = line x1 - line x0;
+    line pend: dict[num] = {};
+    line z = line z0;
+    while (line z <= line z1) {
+        line v = (line z - line z0) / 16;
+        line hl = line h00 + (line h01 - line h00) * line v;
+        line hr = line h10 + (line h11 - line h10) * line v;
+        line bl = line v00 + (line v01 - line v00) * line v;
+        line br = line v10 + (line v11 - line v10) * line v;
+        line ha = num.floor(line hl + 0.5);
+        line ba = gnBioIdx(line bl);
+        line row = [];
+        if (line ha == num.floor(line hl + (line hr - line hl) * line w / 16 + 0.5) && line ba == gnBioIdx(line bl + (line br - line bl) * line w / 16)) {
+            // One height and biome along the whole row.
+            line row.append("%var(x0) %var(x1) %var(ha) %var(ba)");
+        } else {
+            line runX = line x0;
+            line runH = line ha;
+            line runB = line ba;
+            line u = 1;
+            while (line u <= line w) {
+                line h = num.floor(line hl + (line hr - line hl) * line u / 16 + 0.5);
+                line b = gnBioIdx(line bl + (line br - line bl) * line u / 16);
+                if (line h != line runH || line b != line runB) {
+                    line xe = line x0 + line u - 1;
+                    line row.append("%var(runX) %var(xe) %var(runH) %var(runB)");
+                    line runX = line x0 + line u;
+                    line runH = line h;
+                    line runB = line b;
+                }
+                line u += 1;
+            }
+            line row.append("%var(runX) %var(x1) %var(runH) %var(runB)");
+        }
+        // Runs that repeat grow; the others end and are filled.
+        line next: dict[num] = {};
+        for (line rk of line row) {
+            if (line pend.hasKeys(line rk as str)) {
+                line next[line rk as str] = line pend[line rk as str];
+            } else {
+                line next[line rk as str] = line z;
+            }
+        }
+        for (line pk, line pz of line pend) {
+            if (!line next.hasKeys(line pk)) {
+                gnRun(line pk, line pz, line z - 1);
+            }
+        }
+        line pend = line next;
+        line z += 1;
+    }
+    for (line pk, line pz of line pend) {
+        gnRun(line pk, line pz, line z1);
+    }
+    gnDecorate(line ci, line cj, line x0, line z0, line x1, line z1);
+    saved gnBuiltBy[key] = global gnSeed;
+}
+
+/** Fills run "xa xb h b" over rows za..zb: solid soil from y 50, the top
+ * block at h. Canyon soil shows bands of terracotta. */
+function gnRun(run: str, za: num, zb: num) {
+    line f = run.split(" ");
+    line xa = num.parse(line f[1] as str);
+    line xb = num.parse(line f[2] as str);
+    line h = num.parse(line f[3] as str);
+    line bio = gnBioDict(num.parse(line f[4] as str));
+    line top = line bio["top"] as str;
+    line soil = line bio["soil"] as str;
+    if (line h >= 51) {
+        game.setRegion(item(line soil), loc(line xa, 50, za), loc(line xb, line h - 1, zb));
+        if (line soil == "terracotta") {
+            if (line h >= 56) {
+                game.setRegion(item("orange_terracotta"), loc(line xa, 54, za), loc(line xb, num.min(line h - 1, 56), zb));
+            }
+            if (line h >= 60) {
+                game.setRegion(item("white_terracotta"), loc(line xa, 58, za), loc(line xb, num.min(line h - 1, 59), zb));
+            }
+            if (line h >= 64) {
+                game.setRegion(item("red_terracotta"), loc(line xa, 62, za), loc(line xb, num.min(line h - 1, 64), zb));
+            }
+        }
+    }
+    if (line h != 49 || line top != "grass_block") {
+        game.setRegion(item(line top), loc(line xa, line h, za), loc(line xb, line h, zb));
+    }
+    global gnOps += 2 + (line xb - line xa + 1) * (zb - za + 1) * num.max(1, line h - 49) / 400;
+}
+
+/** 1 when column (x, z) is near the road (no trees there). */
+function gnMasked(x: num, z: num): num {
+    line a = num.floor(x / 8);
+    line b = num.floor(z / 8);
+    if (global gnMask.hasKeys("%var(a) %var(b)")) {
+        return 1;
+    }
+    return 0;
+}
+
+/** Trees, plants and boulders of a cell, placed from the seed. */
+function gnDecorate(ci: num, cj: num, x0: num, z0: num, x1: num, z1: num) {
+    line cb = gnBioDict(gnBioAt(x0 + 8, z0 + 8));
+    // Trees: 3 blocks inside the cell, never next to the road.
+    line n = num.floor((line cb["treeN"] as num) + gnHash(ci, cj, 11));
+    repeat (line t to line n) {
+        line x = x0 + 3 + num.floor(gnHash(ci * 8 + line t, cj, 12) * 10);
+        line z = z0 + 3 + num.floor(gnHash(ci * 8 + line t, cj, 13) * 10);
+        if (line x <= x1 - 3 && line z <= z1 - 3 && gnMasked(line x, line z) == 0) {
+            line trees = gnBioDict(gnBioAt(line x, line z))["trees"] as list;
+            if (line trees.len() > 0) {
+                line ty = line trees[num.min(line trees.len(), num.floor(gnHash(ci * 8 + line t, cj, 14) * line trees.len()) + 1)] as str;
+                game.generateTree(loc(line x, gnHeight(line x, line z) + 1, line z), type=line ty);
+                global gnOps += 8;
+            }
+        }
+    }
+    // Plants anywhere (the road's verges clear the ones in their way).
+    line n = num.floor((line cb["plantN"] as num) * (0.6 + 0.8 * gnHash(ci, cj, 15)));
+    repeat (line t to line n) {
+        line x = num.min(x1, x0 + num.floor(gnHash(ci * 16 + line t, cj, 16) * 16));
+        line z = num.min(z1, z0 + num.floor(gnHash(ci * 16 + line t, cj, 17) * 16));
+        line pl = gnBioDict(gnBioAt(line x, line z))["plants"] as list;
+        if (line pl.len() > 0) {
+            line name = line pl[num.min(line pl.len(), num.floor(gnHash(ci * 16 + line t, cj, 18) * line pl.len()) + 1)] as str;
+            line y = gnHeight(line x, line z) + 1;
+            line bare = line name.replace("+", "");
+            if (line bare != line name) {
+                game.setBlock(item(line bare), loc(line x, line y, line z), "half=lower");
+                game.setBlock(item(line bare), loc(line x, line y + 1, line z), "half=upper");
+            } else {
+                game.setBlock(item(line name), loc(line x, line y, line z));
+            }
+            global gnOps += 1;
+        }
+    }
+    // Boulders.
+    line n = num.floor((line cb["rockN"] as num) + gnHash(ci, cj, 19));
+    repeat (line t to line n) {
+        line x = x0 + 3 + num.floor(gnHash(ci * 4 + line t, cj, 20) * 10);
+        line z = z0 + 3 + num.floor(gnHash(ci * 4 + line t, cj, 21) * 10);
+        if (gnMasked(line x, line z) == 0) {
+            mapBoulder(loc(line x, gnHeight(line x, line z), line z));
+            global gnOps += 3;
+        }
+    }
+}
+
+/** Clears cell "ci cj" back to plain grass at y 49, and 3 blocks past each
+ * side whose neighbor is not built for this stage (tree tops reach over).
+ * forget: 1 also drops it from the built cells. */
+function gnWipeCell(key: str, forget: num) {
+    line p = key.split(" ");
+    line ci = num.parse(line p[1] as str);
+    line cj = num.parse(line p[2] as str);
+    line x0 = line ci * 16;
+    line z0 = line cj * 16;
+    line x1 = num.min(line x0 + 15, 1000);
+    line z1 = num.min(line z0 + 15, 1000);
+    line top = 120;
+    if (saved gnBuilt.hasKeys(key)) {
+        line top = saved gnBuilt[key];
+    }
+    if (gnOurs(line ci - 1, line cj) == 0) {
+        line x0 = num.max(0, line x0 - 3);
+    }
+    if (gnOurs(line ci + 1, line cj) == 0) {
+        line x1 = num.min(1000, line x1 + 3);
+    }
+    if (gnOurs(line ci, line cj - 1) == 0) {
+        line z0 = num.max(0, line z0 - 3);
+    }
+    if (gnOurs(line ci, line cj + 1) == 0) {
+        line z1 = num.min(1000, line z1 + 3);
+    }
+    game.setRegion(item("air"), loc(line x0, 50, line z0), loc(line x1, line top, line z1));
+    game.setRegion(item("grass_block"), loc(line x0, 49, line z0), loc(line x1, 49, line z1));
+    game.setRegion(item("dirt"), loc(line x0, 48, line z0), loc(line x1, 48, line z1));
+    global gnOps += 6 + (line x1 - line x0 + 1) * (line z1 - line z0 + 1) * (line top - 49) / 3000;
+    if (forget == 1) {
+        saved gnBuilt.remove(key);
+        saved gnBuiltBy.remove(key);
+    }
+}
+
+/** 1 when cell (ci, cj) is built (or being built) for the current stage. */
+function gnOurs(ci: num, cj: num): num {
+    line key = "%var(ci) %var(cj)";
+    if (saved gnBuiltBy.hasKeys(line key)) {
+        if (saved gnBuiltBy[line key] == global gnSeed || saved gnBuiltBy[line key] == -1) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/** Raises cell top records so a wipe reaches y (a gantry). */
+function gnTouch(x: num, z: num, y: num) {
+    line a = num.floor(x / 16);
+    line b = num.floor(z / 16);
+    line key = "%var(a) %var(b)";
+    if (saved gnBuilt.hasKeys(line key)) {
+        saved gnBuilt[line key] = num.max(saved gnBuilt[line key], y);
+    } else {
+        saved gnBuilt[line key] = y;
+        saved gnBuiltBy[line key] = global gnSeed;
+    }
+}
+
+// ---------------------------------------------------------------- road
+
+/** Shoulders of road point k: 13 x 13 of the biome's verge block at the
+ * road's height, solid below to y 50 and cleared above past the ground. */
+function gnVerge(k: num) {
+    line x = num.round(global gnX[k]);
+    line z = num.round(global gnZ[k]);
+    line hb = num.floor(global gnR2[k] / 2);
+    line bio = gnBioDict(global gnB[k]);
+    line hi = num.max(num.max(gnHeight(line x - 6, line z - 6), gnHeight(line x + 6, line z - 6)), num.max(gnHeight(line x - 6, line z + 6), gnHeight(line x + 6, line z + 6)));
+    line hi = num.max(line hi, gnHeight(line x, line z));
+    if (line hb >= 51) {
+        game.setRegion(item(line bio["soil"] as str), loc(line x - 6, 50, line z - 6), loc(line x + 6, line hb - 1, line z + 6));
+    }
+    game.setRegion(item(line bio["verge"] as str), loc(line x - 6, line hb, line z - 6), loc(line x + 6, line hb, line z + 6));
+    game.setRegion(item("air"), loc(line x - 6, line hb + 1, line z - 6), loc(line x + 6, num.max(line hb + 5, line hi + 1), line z + 6));
+    global gnOps += 8 + num.max(0, line hb - 49) / 3;
+}
+
+/** Heading change around road point k, degrees per step (+ = right). */
+function gnTurn(k: num): num {
+    line a = num.max(1, k - 2);
+    line b = num.min(global gnN, k + 2);
+    if (line b <= line a) {
+        return 0;
+    }
+    return (global gnHd[line b] - global gnHd[line a]) / (line b - line a);
+}
+
+/** Road point k: the road piece, then posts, hay, chevrons and gantries. */
+function gnRoad(k: num) {
+    line x = num.round(global gnX[k]);
+    line z = num.round(global gnZ[k]);
+    line r2 = global gnR2[k];
+    line hb = num.floor(line r2 / 2);
+    mapStamp(line x, line z, line r2, gnBioDict(global gnB[k])["road"] as str);
+    global gnOps += 6;
+    line hd = global gnHd[k];
+    line dx = num.cos(line hd);
+    line dz = num.sin(line hd);
+    line c = gnTurn(k);
+    // The outside of the bend: left of the road (dz, -dx) in a right bend.
+    line nx = line dz;
+    line nz = 0 - line dx;
+    if (line c < 0) {
+        line nx = 0 - line dz;
+        line nz = line dx;
+    }
+    if (k > 3 && k < global gnN - 2) {
+        if (num.abs(line c) >= 4 && k % 4 == 0) {
+            mapProp("post", num.round(global gnX[k] + line nx * 5), line hb + 1, num.round(global gnZ[k] + line nz * 5), 0, 0);
+            global gnOps += 2;
+        }
+        if (num.abs(line c) >= 10 && k % 2 == 0) {
+            mapProp("hay", num.round(global gnX[k] + line nx * 5.5), line hb + 1, num.round(global gnZ[k] + line nz * 5.5), 0, 0);
+            global gnOps += 2;
+        }
+        // A chevron board where a tight bend begins, facing the driver.
+        if (num.abs(line c) >= 8 && num.abs(gnTurn(k - 3)) < 5) {
+            line cx = num.round(global gnX[k] + line dx * 6 + line nx * 9);
+            line cz = num.round(global gnZ[k] + line dz * 6 + line nz * 9);
+            line along = 0;
+            if (num.abs(line dz) > num.abs(line dx)) {
+                line along = 1;
+            }
+            mapProp("chev", line cx, num.max(line hb, gnHeight(line cx, line cz)) + 1, line cz, line along, 0);
+            global gnOps += 6;
+        }
+    }
+    if (k == global gnStartK || k == global gnFinishK) {
+        line ax = 0;
+        if (num.abs(line dx) > num.abs(line dz)) {
+            line ax = 1;
+        }
+        buildGantry(line x, line hb, line z, line ax);
+        gnTouch(line x, line z, line hb + 12);
+        global gnOps += 30;
+        if (k == global gnStartK) {
+            line seed = global gnSeed;
+            gnText(loc(line x + 0.5, line hb + 10.2, line z + 0.5), s"<b><green>START</green></b>", 4);
+            gnText(loc(line x + 0.5, line hb + 13.4, line z + 0.5), s"<b>STAGE #%var(seed)</b>", 2);
+        } else {
+            gnText(loc(line x + 0.5, line hb + 10.2, line z + 0.5), s"<b><red>FINISH</red></b>", 4);
+        }
+    }
+    // The end of the road: a wall of hay bales across it.
+    if (k == global gnN) {
+        line i = -3;
+        while (line i <= 3) {
+            line at = loc(num.round(global gnX[k] + line dz * line i), line hb + 1, num.round(global gnZ[k] - line dx * line i));
+            game.setRegion(item("hay_block"), line at, line at + vec(0, 1, 0));
+            line i += 1;
+        }
+    }
+}
+
+function gnText(at: loc, text: txt, scale: num) {
+    game.spawnTextDisplay(at, text);
+    lastEntity.setDisplayBillboard(type="Vertical");
+    lastEntity.setDisplayScale(scale, scale, scale);
+    lastEntity.setDisplayViewRange(400);
+    global gnTexts.append(lastEntity.uuid);
+}
+
+// ---------------------------------------------------------------- drivers
+
+/** Follows car c along the road (nearest point a little around the last
+ * one) and keeps gnFront at the furthest driver. */
+function gnTrack(c: num) {
+    if (global gnReady == 0) {
+        return;
+    }
+    line key = "%var(c)";
+    line k = 1;
+    if (global gnCarK.hasKeys(line key)) {
+        line k = global gnCarK[line key];
+    }
+    line p = global cPos[c] as vec;
+    line best = line k;
+    line bd = 999999;
+    line j = num.max(1, line k - 2);
+    while (line j <= num.min(global gnN, line k + 8)) {
+        line ex = line p.x - global gnX[line j];
+        line ez = line p.z - global gnZ[line j];
+        line d = line ex * line ex + line ez * line ez;
+        if (line d < line bd) {
+            line bd = line d;
+            line best = line j;
+        }
+        line j += 1;
+    }
+    global gnCarK[line key] = line best;
+    if (line best > global gnFront && line bd < 400) {
+        global gnFront = line best;
+    }
+}
+
+/** Road points built ahead of car c (99 when far ahead or not on it). */
+function gnLeadOf(c: num): num {
+    line key = "%var(c)";
+    if (global gnReady == 0 || !global gnCarK.hasKeys(line key) || global gnSDone >= global gnN) {
+        return 99;
+    }
+    return global gnSDone - global gnCarK[line key];
+}

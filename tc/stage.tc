@@ -1,6 +1,7 @@
-// The stage: @start puts you in a car before the start line; crossing it
-// starts the clock, the checkpoints along the road must be passed in order
-// and the finish line stops it. The best time is kept.
+// The stage: @start puts you in a car before the start line of the
+// procedural stage (tc/gen.tc); crossing it starts the clock, the
+// checkpoints along the road must be passed in order and the finish line
+// stops it. The best time is kept per seed.
 
 /** Checkpoints (vec), the start line first and the finish line last. */
 declare global stPts: list;
@@ -11,7 +12,20 @@ declare saved stBest: num;
 declare saved stBestName: str;
 
 function stageLoad {
-    global stPts = mapCheckpoints();
+    if (global gnReady == 1) {
+        global stPts = gnCheckpoints();
+    } else {
+        global stPts = mapCheckpoints();
+    }
+}
+
+/** The stage's name on the HUD and in messages. */
+function stageName(): str {
+    if (global gnSeed > 0) {
+        line seed = global gnSeed;
+        return "#%var(seed)";
+    }
+    return "SS1";
 }
 
 /** "m:ss.s" for t seconds. */
@@ -62,8 +76,13 @@ function stageTick(c: num) {
     } else {
         global stK[c] = 0;
         line name: str = "%selected";
-        allPlayers.sendMessage(s"<gold><b>SS1</b></gold> <white>%var(name)</white> <gray>finished in</gray> <yellow><b>%var(ts)</b></yellow>");
-        if (saved stBest == 0 || line t < saved stBest) {
+        line sn = stageName();
+        allPlayers.sendMessage(s"<gold><b>Stage %var(sn)</b></gold> <white>%var(name)</white> <gray>finished in</gray> <yellow><b>%var(ts)</b></yellow>");
+        if (global gnSeed > 0) {
+            if (gnRecord(line name, line t) == 1) {
+                allPlayers.sendMessage(s"<gold>New record for stage %var(sn)!");
+            }
+        } else if (saved stBest == 0 || line t < saved stBest) {
             saved stBest = line t;
             saved stBestName = line name;
             allPlayers.sendMessage(s"<gold>New stage record!");
@@ -86,13 +105,66 @@ function stageHud(c: num): str {
     return stageTime(line t);
 }
 
-/** @start: a car before the start line, with you in it. */
-function startCommand {
+/** 1 when someone other than uuid is on a timed run. */
+function stageOthersRunning(uuid: str): num {
+    repeat (line c to num.min(global carCount, global stK.len())) {
+        if (global stK[line c] as num != 0 && global cDriver[line c] != "" && global cDriver[line c] != uuid) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/** @start [new | SEED]: a car before the start line of the stage, with you
+ * in it. No argument: the current stage (or the last one played, or a new
+ * one). "new": a new random seed. A number: that seed. A new stage can't
+ * replace one someone else is driving. */
+function startCommand(arg: str = "") {
     if (carOf(default.uuid) != 0) {
         exitCar();
     }
     ensureLoop();
-    line at = mapStartLoc();
+    line want = -1;
+    if (arg == "new") {
+        line want = num.floor(num.randomd(1, 100000));
+    } else if (arg != "") {
+        line want = num.floor(num.abs(num.parse(arg)));
+    } else if (global gnSeed == 0) {
+        line want = saved gnLast;
+        if (line want <= 0) {
+            line want = num.floor(num.randomd(1, 100000));
+        }
+    }
+    if (line want > 0 && line want != global gnSeed) {
+        if (stageOthersRunning(default.uuid) == 1) {
+            line cur = global gnSeed;
+            default.sendMessage(s"<gray>Someone is driving stage <yellow>#%var(cur)</yellow>; <yellow>@start</yellow> joins it.");
+            return;
+        }
+        gnNewStage(line want);
+    }
+    // Wait for the plan and the first stretch of road.
+    line seed = global gnSeed;
+    line tries = 0;
+    while (global gnReady == 0 || global gnSDone < num.min(global gnPre, global gnN)) {
+        if (global gnSeed != line seed || line tries > 2400) {
+            default.sendMessage(s"<gray>The stage did not get ready.");
+            return;
+        }
+        if (global gnPhase == "clearing") {
+            line pct = num.floor(global gnClearDone * 100 / num.max(1, global gnClearAll));
+            default.sendActionBar(s"<gray>Clearing the old stage %var(pct)%");
+        } else if (global gnReady == 0) {
+            line ph = global gnPhase;
+            default.sendActionBar(s"<gray>Planning stage <yellow>#%var(seed)</yellow> (%var(ph))");
+        } else {
+            line pct = num.floor(global gnSDone * 100 / num.max(1, num.min(global gnPre, global gnN)));
+            default.sendActionBar(s"<gray>Building stage <yellow>#%var(seed)</yellow> %var(pct)%");
+        }
+        wait(5);
+        line tries += 5;
+    }
+    line at = gnStartLoc();
     line yaw: num = line at.getCoordinate(coord="Yaw");
     // Stand beside the spot first, so its chunks load before the car spawns.
     line side = vec(num.cos(line yaw), 0, num.sin(line yaw)) * 2;
@@ -107,9 +179,11 @@ function startCommand {
         global stT.append(0);
     }
     global stK[line c] = 0;
-    if (saved stBest > 0) {
-        line b = stageTime(saved stBest);
-        line who = saved stBestName;
-        default.sendMessage(s"<gray>Stage record: <yellow>%var(b)</yellow> by %var(who).");
+    global gnCarK["%var(c)"] = 1;
+    line names = gnBioNames();
+    default.sendMessage(s"<gold><b>Stage #%var(seed)</b></gold> <gray>%var(names)</gray>");
+    line best = gnBestText(line seed);
+    if (line best != "") {
+        default.sendMessage(s"<gray>Record: <yellow>%var(best)</yellow>.");
     }
 }
