@@ -38,10 +38,13 @@ declare global cGear: list[num];
 declare global cRpm: list[num];
 declare global cShift: list[num];
 declare global cHand: list[num];
-/** Ticks the car keeps simulating without a driver; 1 = a debug part spawn
- * that never simulates. */
+/** Ticks the car keeps simulating without a driver; cStatic 1 = a debug
+ * part spawn that never simulates, 2 = removed (its slot stays, so later
+ * cars keep their numbers). */
 declare global cAwake: list[num];
 declare global cStatic: list[num];
+/** UUID of the player who spawned each car ("" for none). */
+declare global cOwner: list[str];
 /** Strongest impact speed (m/s) this tick, for sound and later damage. */
 declare global cImpact: list[num];
 /** Ticks left in which hits and bottoming out do no damage (after spawning,
@@ -102,8 +105,16 @@ function carAccentOf(uuid: str): num {
     return 8;
 }
 
-/** Spawns a car for the player (default) in their garage colors. */
+/** Spawns a car for the player (default) in their garage colors; their
+ * previous car goes (not for a debug part spawn). */
 function spawnCarFor(at: loc, only: str = ""): num {
+    if (only == "") {
+        repeat (line c to num.min(global carCount, global cOwner.len())) {
+            if (global cOwner[line c] == default.uuid && global cStatic[line c] != 2) {
+                removeCar(line c);
+            }
+        }
+    }
     line cols = carColors();
     return spawnCar(at, cols[carPaintOf(default.uuid)] as num, cols[carAccentOf(default.uuid)] as num, only);
 }
@@ -162,10 +173,16 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     global cImpact.append(0);
     global cGrace.append(40);
     global cThr.append(0);
+    // Cars spawned before owners were kept get none.
+    while (global cOwner.len() < global carCount - 1) {
+        global cOwner.append("");
+    }
     if (only != "") {
         global cStatic.append(1);
+        global cOwner.append("");
     } else {
         global cStatic.append(0);
+        global cOwner.append(default.uuid);
     }
     repeat (line i to 4) {
         global wComp.append(0);
@@ -254,10 +271,17 @@ function carCheck(c: num) {
 /** Forgets cars whose displays are gone (a mode switch removes plot
  * entities but keeps the globals). */
 function dropStaleCars {
-    if (global carCount == 0) {
+    // The first car that was not removed.
+    line first = 0;
+    repeat (line c to global carCount) {
+        if (line first == 0 && global cStatic[line c] != 2) {
+            line first = line c;
+        }
+    }
+    if (line first == 0) {
         return;
     }
-    select entitiesByName(global cSeat[1]);
+    select entitiesByName(global cSeat[line first]);
     if (!selectedEntity.exists()) {
         select reset;
         clearCars();
@@ -312,6 +336,7 @@ function clearCars {
     global cHand = [];
     global cAwake = [];
     global cStatic = [];
+    global cOwner = [];
     global cImpact = [];
     global cGrace = [];
     global cThr = [];
@@ -335,4 +360,27 @@ function spawnCarHere(turn: num = 0, only: str = "") {
     line at = loc(line at.x, line at.y, line at.z, 0, line yaw + turn);
     line c = spawnCarFor(line at, only);
     default.sendMessage(s"<gray>Car <yellow>%var(c)</yellow> spawned. <yellow>@drive</yellow> to get in.");
+}
+
+/** Removes car c: its driver gets out, its displays and seat go, and its
+ * slot is marked removed (cStatic 2) so the other cars keep their numbers. */
+function removeCar(c: num) {
+    line driver = global cDriver[c];
+    if (line driver != "") {
+        global cDriver[c] = "";
+        driverRemove(line driver);
+        select playersByName(line driver);
+        selected.rideEntity();
+        select reset;
+        if (line driver == default.uuid) {
+            giveRoadbook();
+        }
+    }
+    removeDisplays(global cAll[c] as list);
+    select entitiesByName(global cSeat[c]);
+    selectedEntity.remove();
+    select reset;
+    global cStatic[c] = 2;
+    global cAwake[c] = 0;
+    global cTp[c] = [];
 }

@@ -119,8 +119,12 @@ function carsTick {
         global gColCache = {};
     }
     global cpuAvg = global cpuAvg * 0.9 + game.cpuUsage * 0.1;
+    // Cars spawned before car owners were kept get none.
+    while (global cOwner.len() < global carCount) {
+        global cOwner.append("");
+    }
     repeat (line c to global carCount) {
-        if (global cStatic[line c] == 1) {
+        if (global cStatic[line c] != 0) {
             continue;
         }
         carStateCheck(line c);

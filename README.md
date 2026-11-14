@@ -55,7 +55,7 @@ the way the 26.3 client does, once per define set the game uses for it
 | `@tpf FWD [UP [RIGHT]]` | Teleport relative to where you look |
 | `@look YAW [PITCH]`, `@where` | Turn on the spot; show plot and absolute position |
 | `@spec`, `@fly`, `@walk` | Spectator, creative flying, adventure |
-| `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees |
+| `@car [turn]` | Spawn a car 6 blocks ahead, facing your way turned by `turn` degrees (your previous car goes; each player has one) |
 | `@drive` | Get in the nearest free car within 8 blocks |
 | `@exit` | Get out (same as F) |
 | `@flip` | Debug: roll your car (or the nearest) onto its roof |
