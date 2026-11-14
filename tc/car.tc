@@ -44,7 +44,7 @@ declare global cHand: list[num];
 declare global cAwake: list[num];
 declare global cStatic: list[num];
 /** UUID of the player who spawned each car ("" for none), and its model
- * (1 rally hatchback, 2 hypercar). */
+ * (1 rally hatchback, 2 supercar). */
 declare global cOwner: list[str];
 declare global cModel: list[num];
 /** Strongest impact speed (m/s) this tick, for sound and later damage. */
@@ -56,7 +56,7 @@ declare global cGrace: list[num];
 declare global cThr: list[num];
 /** Traction control's power share this tick (1 = full power). */
 declare global cTc: list[num];
-/** Hypercar turbo boost (0..1), and 1 for a tick when it was dumped on a
+/** Supercar turbo boost (0..1), and 1 for a tick when it was dumped on a
  * lift or shift (the blow-off valve sound). */
 declare global cBoost: list[num];
 declare global cBov: list[num];
@@ -97,7 +97,7 @@ function carColorHexes(): list {
 declare saved carPaintSel: dict[num];
 declare saved carAccentSel: dict[num];
 
-/** Per player UUID: the chosen car model (1 rally hatchback, 2 hypercar,
+/** Per player UUID: the chosen car model (1 rally hatchback, 2 supercar,
  * 3 muscle car). */
 declare saved carModelSel: dict[num];
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Procedural engine sound: the rally car's 2.0 turbo inline-4, the
-hypercar's 4.0 twin-turbo V8 and the muscle car's 7.0 big-block V8.
+supercar's 4.0 twin-turbo V8 and the muscle car's 7.0 big-block V8.
 
     python3 pack/src/engine_sound.py                       # built-in combustion pulse
     python3 pack/src/engine_sound.py --pulse bang.wav      # your own pulse

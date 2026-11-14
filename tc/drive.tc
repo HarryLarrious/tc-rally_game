@@ -216,7 +216,7 @@ function carHud(c: num) {
     if (global cTc[c] < 0.95) {
         line tcs = " TC";
     }
-    // The hypercar's boost pressure (1.4 bar at full boost).
+    // The supercar's boost pressure (1.4 bar at full boost).
     if (global cModel[c] == 2) {
         line bar = num.round(global cBoost[c] * 14) / 10;
         line tcs = "%var(tcs)  +%var(bar) bar";

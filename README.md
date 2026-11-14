@@ -11,10 +11,10 @@ separate parts, so they can be damaged and broken apart.
 | [car/](car/) | Car design: [README](car/README.md), [part list](car/PARTS.md), `parts.json` for the game code |
 | [pack/](pack/) | Resource pack (Minecraft 26.3, format 97.1), namespace `rally` |
 | [pack/src/car_parts.py](pack/src/car_parts.py) | Generates the car models, textures and part data |
-| [pack/src/car_hyper.py](pack/src/car_hyper.py) | The hypercar: its body panels and rear twin-turbo V8 layout (same parts, different shapes) |
+| [pack/src/car_super.py](pack/src/car_super.py) | The supercar: its body panels and rear twin-turbo V8 layout (same parts, different shapes) |
 | [pack/src/car_muscle.py](pack/src/car_muscle.py) | The muscle car: its fastback body panels, slotted wheels and front big-block V8 |
 | [tc/](tc/) | Terracotta code for the plot (206003, Mega): pack, commands, car spawning; `car_data.tc` is generated |
-| [pack/src/engine_sound.py](pack/src/engine_sound.py) | Synthesizes the engine sound loops (inline-4, the hypercar's V8, turbo whistle and blow-off valve, and the muscle car's big-block V8) |
+| [pack/src/engine_sound.py](pack/src/engine_sound.py) | Synthesizes the engine sound loops (inline-4, the supercar's V8, turbo whistle and blow-off valve, and the muscle car's big-block V8) |
 | [pack/src/driver.py](pack/src/driver.py) | Generates the driver model's item models and `tc/driver_data.tc` (its pose) |
 | [pack/assets/minecraft/shaders/core/](pack/assets/minecraft/shaders/core/) | Entity core shader: draws player heads as the driver's body parts |
 | [tools/build_pack.py](tools/build_pack.py) | Validates, zips and publishes the pack to the `pack-dist` branch |
@@ -220,7 +220,7 @@ start button, and spawn car.
 The garage is a second panel hinged to the board's right edge, turned 40
 degrees toward the player (each panel has its own frame, and a click hits
 whichever panel the crosshair is on). It holds the car model (the rally
-hatchback, the hypercar or the muscle car, see [car/README.md](car/README.md)), primary and
+hatchback, the supercar or the muscle car, see [car/README.md](car/README.md)), primary and
 secondary colors (8 swatches each, with a livery preview), and rows for
 decals and parts to come. The model and colors are used by every car the
 player spawns.

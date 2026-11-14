@@ -40,7 +40,7 @@
   <div id="info">Select a part.</div>
 </div>
 <script>
-// ?car=hyper shows the hypercar body (car_data_hyper.js).
+// ?car=super shows the supercar body (car_data_super.js).
 const look = new URLSearchParams(location.search).get("car");
 document.write('<script src="car_data' + (look ? "_" + look.replace(/[^a-z]/g, "") : "") + '.js"><\/script>');
 </script>

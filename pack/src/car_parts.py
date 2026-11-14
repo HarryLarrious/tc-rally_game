@@ -9,8 +9,8 @@ Writes:
   pack/assets/rally/textures/item/car/<mat>.png    material textures
   car/parts.json                                   the part spec the game code reads
   tools/viewer/car_data.js                         the same data for the 3D viewer
-  pack/assets/rally/{models/item,items}/car_hyper/ the hypercar body (car_hyper.py)
-  car/parts_hyper.json, tools/viewer/car_data_hyper.js  its spec and viewer data
+  pack/assets/rally/{models/item,items}/car_super/ the supercar body (car_super.py)
+  car/parts_super.json, tools/viewer/car_data_super.js  its spec and viewer data
   pack/assets/rally/{models/item,items}/car_muscle/ the muscle car body (car_muscle.py)
   car/parts_muscle.json, tools/viewer/car_data_muscle.js  its spec and viewer data
 
@@ -1050,7 +1050,7 @@ def write_tc_data(spec: dict, looks: list[dict]) -> None:
                   1 if p["damaged_model"] else 0, *center, *half, *local]
         stats.append('        "' + " ".join(tc_num(f) if isinstance(f, float) else str(f) for f in fields)
                      + f' {shield} {rest}"')
-    # Per car model (1 rally hatchback, 2 hypercar, 3 muscle car): item models and hitboxes.
+    # Per car model (1 rally hatchback, 2 supercar, 3 muscle car): item models and hitboxes.
     items_fn = "function carPartItems(m: num): list {\n"
     boxes_fn = "function carPartBoxes(m: num): list {\n"
     for n, look in enumerate(looks, start=1):
@@ -1089,7 +1089,7 @@ def write_tc_data(spec: dict, looks: list[dict]) -> None:
         + decl + "\n\n/** Sets the geometry globals. */\nfunction loadCarGeom {\n" + gl + "\n}\n\n"
         f"/** Number of car models. */\nfunction carModelCount(): num {{\n    return {len(looks)};\n}}\n\n"
         "/** Item model of each part (carPartData order) for car model m: 1 rally\n"
-        " * hatchback, 2 hypercar, 3 muscle car (their body panels have their own\n"
+        " * hatchback, 2 supercar, 3 muscle car (their body panels have their own\n"
         " * models). */\n" + items_fn + "\n"
         "/** Hitbox and shields per part for car model m: \"cx cy cz hx hy hz lx ly lz\n"
         " * shields\" (center and half size in the car frame at rest, center in the\n"
@@ -1220,13 +1220,13 @@ def write_variant(folder: str, parts: list[Part], own: set[str] | None, tex_b64:
 
 
 def main():
-    import car_hyper
+    import car_super
     import car_muscle
 
     build_parts()
     shared = shared_models()
     looks = [("car", list(PARTS), None)]
-    for folder, mod, body in (("car_hyper", car_hyper, car_hyper.hyper_body()),
+    for folder, mod, body in (("car_super", car_super, car_super.super_body()),
                               ("car_muscle", car_muscle, car_muscle.muscle_body())):
         parts = variant_parts(PARTS, body, mod.SHIELDS, mod.LABELS)
         own = set(body)

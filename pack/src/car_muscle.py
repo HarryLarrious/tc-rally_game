@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from car_hyper import cage as hyper_cage
+from car_super import cage as super_cage
 from car_parts import AXLE_F, AXLE_R, arch, beam, box, mirror_x, plate, prism
 
 
@@ -309,7 +309,7 @@ def muscle_body() -> dict:
     Hinged parts keep the rally car's pivots."""
     out = {
         "engine": (engine(), None), "exhaust": (exhaust(), None),
-        "shell": (shell(), None), "cage": (hyper_cage(), None), "windshield": (windshield(), None),
+        "shell": (shell(), None), "cage": (super_cage(), None), "windshield": (windshield(), None),
         "rear_window": (rear_window(), None), "hood": (hood(), (0.0, 0.95, 1.02)),
         "lightpod": (lightpod(), None), "bumper_f": (bumper_f(), None), "bumper_r": (bumper_r(), None),
         "hatch": (hatch(), (0.0, 1.0, -0.98)), "wing": (wing(), None),

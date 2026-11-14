@@ -1,7 +1,7 @@
 # Car design
 
 The rally car is a two-door hatchback with four-wheel drive and a front engine.
-It also comes as a **hypercar** (`pack/src/car_hyper.py`): the same cage
+It also comes as a **supercar** (`pack/src/car_super.py`): the same cage
 layout, suspension and drive shafts under a low, wide, angular body (a hood
 that slopes down into a low nose with a black scoop stripe, fender crests
 breaking into steeper tips with slim LED headlight slashes, dark intakes under
@@ -12,9 +12,9 @@ swan-neck wing). Its engine sits behind the seats: a 4.0 twin-turbo V8
 mounted lengthwise, with a transaxle behind it, the fuel cell in the nose and
 twin center tail pipes, on its own chassis with the firewall behind the seats.
 Its parts keep the rally car's ids (so HP, parents and effects are the same);
-their models (`rally:car_hyper/<part>`), hitboxes and shields differ
-(`parts_hyper.json`, `carPartItems(m)` and `carPartBoxes(m)` in
-`tc/car_data.tc`). The viewer shows it with `index.html?car=hyper`.
+their models (`rally:car_super/<part>`), hitboxes and shields differ
+(`parts_super.json`, `carPartItems(m)` and `carPartBoxes(m)` in
+`tc/car_data.tc`). The viewer shows it with `index.html?car=super`.
 
 In game the V8 makes 520 N m without boost (best at 4500 rpm) and up to
 850 N m with it: the turbos build boost under throttle above 2000 rpm, in
