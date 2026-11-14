@@ -6,9 +6,12 @@
 // of the columns around it: tent weights out to tSmooth blocks (@tune
 // smooth, default 5, so 10 x 10 columns). A one-block step becomes a ramp
 // about 2 * tSmooth blocks long instead of a hard edge.
-// A column that rises more than 1.25 above the wheel, or drops more than
-// 1.6, is left out of the average: it is a wall (or a cliff) and the body
-// probes treat it as one.
+// The column right under the wheel sets the reference: only columns within
+// one block of it are blended, so a one-block step is ramped but a bigger
+// drop is not (the wheel would otherwise ride on the ledge above it, out
+// over nothing). When that column rises more than 1.25 above the wheel or
+// drops more than 1.6 below it, there is no ground under the wheel: a wall
+// is left to the body probes, and over a drop the wheel hangs.
 
 /** Surface height per "x z base" column, or -999 for none. */
 declare global gColCache: dict[num];
@@ -35,7 +38,7 @@ function colTop(x: num, z: num, base: num): num {
 }
 
 /** Smoothed ground height at world (x, z) for something whose bottom is at
- * about y, or -999 when no column near it counts as ground. */
+ * about y, or -999 when the column under it is not ground. */
 function groundAt(x: num, z: num, y: num): num {
     line base = num.floor(y);
     line cx = num.floor(x);
@@ -43,6 +46,12 @@ function groundAt(x: num, z: num, y: num): num {
     line r = global tSmooth;
     if (line r < 1) {
         line r = 5;
+    }
+    // The column under the wheel.
+    line tc = colTop(line cx, line cz, line base);
+    line rise0 = line tc - y;
+    if (line rise0 > 1.25 || line rise0 < -1.6) {
+        return -999;
     }
     line sw = 0;
     line sh = 0;
@@ -53,8 +62,7 @@ function groundAt(x: num, z: num, y: num): num {
                 line wz = 1 - num.abs(line cz + line dz as num + 0.5 - z) / line r;
                 if (line wz > 0) {
                     line t = colTop(line cx + line dx as num, line cz + line dz as num, line base);
-                    line rise = line t - y;
-                    if (line rise <= 1.25 && line rise >= -1.6) {
+                    if (num.abs(line t - line tc) <= 1.05) {
                         line wt = line wx * line wz;
                         line sw += line wt;
                         line sh += line wt * line t;
