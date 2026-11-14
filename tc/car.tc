@@ -52,6 +52,8 @@ declare global cImpact: list[num];
 declare global cGrace: list[num];
 /** 1 while the engine is under throttle this tick (engine sound). */
 declare global cThr: list[num];
+/** Traction control's power share this tick (1 = full power). */
+declare global cTc: list[num];
 /** Per wheel, 4 per car (car c, corner i at (c - 1) * 4 + i): suspension
  * compression (m), roll angle (degrees), surface grip, and 1 when the tire
  * is sliding. */
@@ -173,6 +175,7 @@ function spawnCar(at: loc, paint: num, accent: num, only: str = ""): num {
     global cImpact.append(0);
     global cGrace.append(40);
     global cThr.append(0);
+    global cTc.append(1);
     // Cars spawned before owners were kept get none.
     while (global cOwner.len() < global carCount - 1) {
         global cOwner.append("");
@@ -340,6 +343,7 @@ function clearCars {
     global cImpact = [];
     global cGrace = [];
     global cThr = [];
+    global cTc = [];
     global wComp = [];
     global wSpin = [];
     global wMu = [];

@@ -112,6 +112,17 @@ function gearManual(uuid: str): num {
     return 0;
 }
 
+/** Traction control per player uuid: 0 off, 1 or missing on. */
+declare saved tcMode: dict[num];
+
+/** 1 when player uuid drives with traction control (the default). */
+function tcOn(uuid: str): num {
+    if (uuid != "" && saved tcMode.hasKeys(uuid)) {
+        return saved tcMode[uuid];
+    }
+    return 1;
+}
+
 /** Manual gearbox: shifts the player's car up (dir 1) or down (dir -1).
  * Up from reverse goes to first; there is no neutral. */
 function shiftGear(dir: num) {
@@ -201,11 +212,28 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
         }
     }
     line rpm = line road;
-    if (line throttle > 0 && line spinning >= 1) {
-        // No traction control: spinning tires let the engine rev freely into
-        // the limiter (torque cuts above 7800, so it bounces there).
-        line rpm = num.max(line rpm, global cRpm[c] + (8000 - global cRpm[c]) * 0.3);
+    // Traction control (on unless the driver turned it off in the menu):
+    // while a tire is past its grip under power, the power share drops by
+    // 30% a tick (to 25% at least) and comes back 8% a tick once they grip,
+    // and the revs stay with the road. The tires then keep their side grip
+    // instead of spending it all on wheelspin.
+    line tc = tcOn(global cDriver[c]);
+    line cut = global cTc[c];
+    if (line tc == 1) {
+        if (line throttle > 0 && line spinning >= 1) {
+            line cut = num.max(0.25, line cut * 0.7);
+        } else {
+            line cut = num.min(1, line cut + 0.08);
+        }
+    } else {
+        line cut = 1;
+        if (line throttle > 0 && line spinning >= 1) {
+            // No traction control: spinning tires let the engine rev freely
+            // into the limiter (torque cuts above 7800, so it bounces there).
+            line rpm = num.max(line rpm, global cRpm[c] + (8000 - global cRpm[c]) * 0.3);
+        }
     }
+    global cTc[c] = line cut;
     if (line throttle > 0) {
         line rpm = num.max(line rpm, 2600);
     }
@@ -233,7 +261,7 @@ function carStep(c: num, fwdIn: num, sideIn: num, hand: num) {
     }
     line drive = 0;
     if (line shift == 0 && global cGearMax[c] > 0) {
-        line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c];
+        line drive = engineTorque(line rpm) * line ratio * 4.1 * 0.85 / global gWheelR * line throttle * global tPower * global cPower[c] * line cut;
     }
     // Limiter: above 7800 the fuel is cut (no torque this tick) and the revs
     // drop, so an engine revving on spinning tires bounces off it instead

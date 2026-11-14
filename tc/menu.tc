@@ -151,6 +151,10 @@ function menuChosen(id: str): num {
     if (id == "model_hatch") {
         return 1;
     }
+    line tc = tcOn(default.uuid);
+    if ((id == "tc_on" && line tc == 1) || (id == "tc_off" && line tc == 0)) {
+        return 1;
+    }
     line p = carPaintOf(default.uuid);
     line a = carAccentOf(default.uuid);
     if (id == "paint %var(p)" || id == "accent %var(a)") {
@@ -222,16 +226,20 @@ function menuBuild(st0: dict): dict {
         line out.append({kind: "deco", ent: menuRect(line st, -1.6 + 0.08 + (line i - 1) * 0.16, 0.715, 0.16, 0.09, line col, 100, 0.02)});
     }
     // Gearbox.
-    line out.append({kind: "deco", ent: menuText(line st, -1.05, 0.5, "GEARBOX", "label", 0.55)});
-    line out.append(menuButton(line st, "gear_auto", 0.05, 0.5, 0.8, 0.2, "AUTO", 0.45, "gear auto"));
-    line out.append(menuButton(line st, "gear_manual", 0.95, 0.5, 0.8, 0.2, "MANUAL", 0.45, "gear manual"));
-    line out.append({kind: "text", id: "gear_note", ent: menuText(line st, 0.45, 0.32, menuGearNote(), "body", 0.34)});
+    line out.append({kind: "deco", ent: menuText(line st, -1.05, 0.56, "GEARBOX", "label", 0.5)});
+    line out.append(menuButton(line st, "gear_auto", 0.05, 0.56, 0.8, 0.17, "AUTO", 0.42, "gear auto"));
+    line out.append(menuButton(line st, "gear_manual", 0.95, 0.56, 0.8, 0.17, "MANUAL", 0.42, "gear manual"));
+    line out.append({kind: "text", id: "gear_note", ent: menuText(line st, 0.45, 0.42, menuGearNote(), "body", 0.32)});
+    // Traction control.
+    line out.append({kind: "deco", ent: menuText(line st, -1.05, 0.26, "TRACTION", "label", 0.5)});
+    line out.append(menuButton(line st, "tc_on", 0.05, 0.26, 0.8, 0.17, "ON", 0.42, "tc on"));
+    line out.append(menuButton(line st, "tc_off", 0.95, 0.26, 0.8, 0.17, "OFF", 0.42, "tc off"));
     // The driver model's arms: match the player's skin (Classic 4 px or Slim 3 px).
-    line out.append({kind: "deco", ent: menuText(line st, -1.05, 0.12, "ARMS", "label", 0.55)});
-    line out.append(menuButton(line st, "arms_classic", 0.05, 0.12, 0.8, 0.2, "CLASSIC", 0.45, "arms classic"));
-    line out.append(menuButton(line st, "arms_slim", 0.95, 0.12, 0.8, 0.2, "SLIM", 0.45, "arms slim"));
+    line out.append({kind: "deco", ent: menuText(line st, -1.05, 0.07, "ARMS", "label", 0.5)});
+    line out.append(menuButton(line st, "arms_classic", 0.05, 0.07, 0.8, 0.17, "CLASSIC", 0.42, "arms classic"));
+    line out.append(menuButton(line st, "arms_slim", 0.95, 0.07, 0.8, 0.17, "SLIM", 0.42, "arms slim"));
     // Divider.
-    line out.append({kind: "deco", ent: menuRect(line st, 0, 0.0, 2.9, 0.012, "#3A3F47", 100, 0.02)});
+    line out.append({kind: "deco", ent: menuRect(line st, 0, -0.05, 2.9, 0.012, "#3A3F47", 100, 0.02)});
     // The stage: the current procedural stage (or the last one played).
     line seed = global gnSeed;
     if (line seed == 0) {
@@ -249,8 +257,8 @@ function menuBuild(st0: dict): dict {
     }
     line out.append({kind: "deco", ent: menuText(line st, -0.75, -0.2, line title, "label", 0.5)});
     line out.append({kind: "deco", ent: menuText(line st, -0.75, -0.38, line sub, "body", 0.36)});
-    line out.append(menuButton(line st, "start", 0.95, -0.17, 1.0, 0.2, "DRIVE STAGE", 0.42, "start"));
-    line out.append(menuButton(line st, "new", 0.95, -0.41, 1.0, 0.2, "NEW STAGE", 0.42, "new"));
+    line out.append(menuButton(line st, "start", 0.95, -0.2, 1.0, 0.2, "DRIVE STAGE", 0.42, "start"));
+    line out.append(menuButton(line st, "new", 0.95, -0.43, 1.0, 0.2, "NEW STAGE", 0.42, "new"));
     // Bottom row and hint.
     line out.append(menuButton(line st, "car", -0.95, -0.66, 1.0, 0.22, "SPAWN CAR", 0.42, "car"));
     line out.append(menuButton(line st, "close", 0.95, -0.66, 1.0, 0.22, "CLOSE", 0.42, "close"));
@@ -479,6 +487,16 @@ function menuAction(action: str) {
     }
     if (action == "model hatch") {
         default.playSound(snd("UI Button Click"));
+        return;
+    }
+    if (action == "tc on" || action == "tc off") {
+        if (action == "tc off") {
+            saved tcMode[line uuid] = 0;
+        } else {
+            saved tcMode[line uuid] = 1;
+        }
+        default.playSound(snd("UI Button Click"));
+        menuRepaint();
         return;
     }
     if (action == "arms classic" || action == "arms slim") {

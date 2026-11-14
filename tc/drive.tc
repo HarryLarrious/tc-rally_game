@@ -123,6 +123,9 @@ function carsTick {
     while (global cOwner.len() < global carCount) {
         global cOwner.append("");
     }
+    while (global cTc.len() < global carCount) {
+        global cTc.append(1);
+    }
     repeat (line c to global carCount) {
         if (global cStatic[line c] != 0) {
             continue;
@@ -199,14 +202,19 @@ function carHud(c: num) {
         line sn = stageName();
         line st = "   %var(sn) %var(st)";
     }
+    // Traction control cutting power.
+    line tcs = "";
+    if (global cTc[c] < 0.95) {
+        line tcs = " TC";
+    }
     // The builder is close behind: the road ahead is still being made.
     if (gnLeadOf(c) < 25) {
         line st = "%var(st)   BUILDING AHEAD";
     }
     if (global rTick - global cHand[c] <= 1) {
-        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray><gold>%var(st)</gold>   <red><b>HANDBRAKE</b></red>");
+        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow><gold><b>%var(tcs)</b></gold>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray><gold>%var(st)</gold>   <red><b>HANDBRAKE</b></red>");
     } else {
-        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray><gold>%var(st)</gold>");
+        selected.sendActionBar(s"<white><b>%var(kmh)</b></white> <gray>km/h</gray>   <yellow>%var(g)</yellow><gold><b>%var(tcs)</b></gold>   <white>%var(rpm)</white> <gray>rpm   CPU %var(cpu)%</gray><gold>%var(st)</gold>");
     }
     select reset;
 }

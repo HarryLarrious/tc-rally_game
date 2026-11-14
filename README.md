@@ -162,8 +162,14 @@ shows speed, gear (`M3` = third with the manual gearbox), rpm and plot CPU.
 The gearbox is set per player in the menu. Auto shifts up as the engine nears
 the redline (wheelspin included) and down when it would bog, but not while the
 tires spin. Manual shifts only on clicks: left click up, right click down.
-There is no traction control: spinning or sliding tires rev the engine into
-the 7800 rpm limiter, which cuts the power for a tick and drops the revs.
+Traction control is on by default (TRACTION on the service board, per
+player): while a tire is past its grip under power, the power drops by 30%
+a tick (down to 25%) and comes back 8% a tick once the tires grip, and the
+revs stay with the road speed, so the tires keep their side grip. The HUD
+shows TC while it cuts. With it off, spinning or sliding tires rev the
+engine into the 7800 rpm limiter, which cuts the power for a tick and drops
+the revs; the spinning tires then spend most of their grip along the wheel,
+which is what keeps a drift going.
 
 ## Driver model
 
