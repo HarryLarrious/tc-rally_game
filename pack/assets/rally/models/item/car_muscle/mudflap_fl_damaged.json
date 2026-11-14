@@ -1,0 +1,86 @@
+{
+ "textures": {
+  "plastic_dmg": "rally:item/car/plastic_dmg",
+  "particle": "rally:item/car/plastic_dmg"
+ },
+ "elements": [
+  {
+   "from": [
+    14.3865,
+    10.4909,
+    14.2634
+   ],
+   "to": [
+    14.8665,
+    11.9309,
+    14.4234
+   ],
+   "rotation": {
+    "origin": [
+     14.6265,
+     11.2109,
+     14.3434
+    ],
+    "x": 0.155,
+    "y": -2.607,
+    "z": -4.651
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#plastic_dmg"
+    }
+   }
+  }
+ ]
+}

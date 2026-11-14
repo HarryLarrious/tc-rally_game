@@ -11,6 +11,8 @@ Writes:
   tools/viewer/car_data.js                         the same data for the 3D viewer
   pack/assets/rally/{models/item,items}/car_hyper/ the hypercar body (car_hyper.py)
   car/parts_hyper.json, tools/viewer/car_data_hyper.js  its spec and viewer data
+  pack/assets/rally/{models/item,items}/car_muscle/ the muscle car body (car_muscle.py)
+  car/parts_muscle.json, tools/viewer/car_data_muscle.js  its spec and viewer data
 
 This file is the single source of truth for the car. Geometry is written in
 car-frame meters (1 m = 1 block):
@@ -80,6 +82,7 @@ MATERIALS: dict[str, dict] = {
     "taillight": {"emit": 10},
     "carbon":    {},
     "led":       {"emit": 15},
+    "chrome":    {},
 }
 
 
@@ -193,6 +196,16 @@ def make_textures() -> dict[str, Image.Image]:
             d.rectangle(((x + off) % 16, y, (x + off) % 16 + 1, y), fill=(52, 54, 60, 255))
     t["carbon"] = carbon
     t["led"] = _flat((236, 244, 255), noise=2, seed=25)
+    # Chrome: bright, with a darker band so flat faces still read as metal.
+    chrome = _flat((226, 230, 236), noise=3, seed=26)
+    px = chrome.load()
+    for x in range(16):
+        for y in (9, 10, 11):
+            r, g, b, a = px[x, y]
+            px[x, y] = (r - 70, g - 66, b - 60, a)
+        r, g, b, a = px[x, 3]
+        px[x, 3] = (255, 255, 255, a)
+    t["chrome"] = chrome
     return t
 
 
@@ -1037,7 +1050,7 @@ def write_tc_data(spec: dict, looks: list[dict]) -> None:
                   1 if p["damaged_model"] else 0, *center, *half, *local]
         stats.append('        "' + " ".join(tc_num(f) if isinstance(f, float) else str(f) for f in fields)
                      + f' {shield} {rest}"')
-    # Per car model (1 rally hatchback, 2 hypercar): item models and hitboxes.
+    # Per car model (1 rally hatchback, 2 hypercar, 3 muscle car): item models and hitboxes.
     items_fn = "function carPartItems(m: num): list {\n"
     boxes_fn = "function carPartBoxes(m: num): list {\n"
     for n, look in enumerate(looks, start=1):
@@ -1076,7 +1089,8 @@ def write_tc_data(spec: dict, looks: list[dict]) -> None:
         + decl + "\n\n/** Sets the geometry globals. */\nfunction loadCarGeom {\n" + gl + "\n}\n\n"
         f"/** Number of car models. */\nfunction carModelCount(): num {{\n    return {len(looks)};\n}}\n\n"
         "/** Item model of each part (carPartData order) for car model m: 1 rally\n"
-        " * hatchback, 2 hypercar (its body panels have their own models). */\n" + items_fn + "\n"
+        " * hatchback, 2 hypercar, 3 muscle car (their body panels have their own\n"
+        " * models). */\n" + items_fn + "\n"
         "/** Hitbox and shields per part for car model m: \"cx cy cz hx hy hz lx ly lz\n"
         " * shields\" (center and half size in the car frame at rest, center in the\n"
         " * part's own frame, part indices that take hits first or -). */\n" + boxes_fn
@@ -1206,18 +1220,21 @@ def write_variant(folder: str, parts: list[Part], own: set[str] | None, tex_b64:
 
 
 def main():
-    from car_hyper import LABELS, MODELS, SHIELDS, hyper_body
+    import car_hyper
+    import car_muscle
 
     build_parts()
-    hyper_src = hyper_body()
     shared = shared_models()
-    hyper = variant_parts(PARTS, hyper_src, SHIELDS, LABELS)
-    hyper_own = set(hyper_src)
-    for p in hyper:
-        if p.model in MODELS:
-            p.elems = MODELS[p.model]
-            hyper_own.add(p.id)
-    looks = [("car", list(PARTS), None), ("car_hyper", hyper, hyper_own)]
+    looks = [("car", list(PARTS), None)]
+    for folder, mod, body in (("car_hyper", car_hyper, car_hyper.hyper_body()),
+                              ("car_muscle", car_muscle, car_muscle.muscle_body())):
+        parts = variant_parts(PARTS, body, mod.SHIELDS, mod.LABELS)
+        own = set(body)
+        for p in parts:
+            if p.model in mod.MODELS:
+                p.elems = mod.MODELS[p.model]
+                own.add(p.id)
+        looks.append((folder, parts, own))
     for _, parts, _ in looks:
         for p in parts:
             if p.elems is None:
@@ -1252,13 +1269,16 @@ def main():
 
     specs = [write_variant(folder, parts, own, tex_b64) for folder, parts, own in looks]
     # The game shares everything but the models and hitboxes between looks.
-    for a, b in zip(specs[0]["parts"], specs[1]["parts"]):
-        for key in ("id", "parent", "hp", "on_break", "rigid", "rest", "anim", "model"):
-            if a[key] != b[key]:
-                raise SystemExit(f"hypercar part {a['id']} differs in {key}")
+    for (folder, _, _), spec in zip(looks[1:], specs[1:]):
+        for a, b in zip(specs[0]["parts"], spec["parts"]):
+            for key in ("id", "parent", "hp", "on_break", "rigid", "rest", "anim", "model"):
+                if a[key] != b[key]:
+                    raise SystemExit(f"{folder} part {a['id']} differs in {key}")
     (ROOT / "car").mkdir(exist_ok=True)
     (ROOT / "car/parts.json").write_text(json.dumps(specs[0], indent=1) + "\n")
-    (ROOT / "car/parts_hyper.json").write_text(json.dumps(specs[1], indent=1) + "\n")
+    for (folder, _, _), spec in zip(looks[1:], specs[1:]):
+        name = folder.split("_", 1)[1]
+        (ROOT / f"car/parts_{name}.json").write_text(json.dumps(spec, indent=1) + "\n")
     write_parts_table(specs[0])
     write_tc_data(specs[0], specs)
 

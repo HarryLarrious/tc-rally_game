@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Procedural engine sound: the rally car's 2.0 turbo inline-4 and the
-hypercar's 4.0 twin-turbo V8.
+"""Procedural engine sound: the rally car's 2.0 turbo inline-4, the
+hypercar's 4.0 twin-turbo V8 and the muscle car's 7.0 big-block V8.
 
     python3 pack/src/engine_sound.py                       # built-in combustion pulse
     python3 pack/src/engine_sound.py --pulse bang.wav      # your own pulse
@@ -22,13 +22,17 @@ the same cycle is baked at three base speeds (crossfaded at 1900 and 4100 rpm):
   pack/assets/rally/sounds/engine/v8_*.ogg  the same three clips and pop for the V8
   pack/assets/rally/sounds/engine/turbo.ogg the V8's turbo whistle (pitched with boost)
   pack/assets/rally/sounds/engine/bov.ogg   its blow-off valve (boost dumped on a lift)
+  pack/assets/rally/sounds/engine/mv8_*.ogg the muscle car's V8: the three clips and pop
   pack/assets/rally/sounds.json             engine.<clip> for each
 
 The V8 is a cross-plane engine: four firings per crank revolution (firing
 order 1-8-4-3-6-5-7-2), alternating unevenly between the banks (L R R L R L
 L R). Each bank has its own exhaust with its own pipe resonance, which gives
 the burble; the pulses are bigger and lower than the inline-4's. Its turbo
-whistle is a separate clip so it can follow the boost, not the rpm.
+whistle is a separate clip so it can follow the boost, not the rpm. The
+muscle car's big-block is the same V8 with bigger, slower pulses, a long
+cam (uneven firings that lope at low rpm), freer and lower pipes and no
+turbos.
 
 How a cycle is built:
   - Combustion: one pulse per firing. An inline-4 fires twice per crank
@@ -124,23 +128,28 @@ def resonance(x: np.ndarray, hz: float, q: float) -> np.ndarray:
     return signal.lfilter(b, a, x)
 
 
-def render_v8(rpm: float, on: bool, pulse: np.ndarray, seed: int, seconds: float = 1.0) -> np.ndarray:
+def render_v8(rpm: float, on: bool, pulse: np.ndarray, seed: int, seconds: float = 1.0,
+              muscle: bool = False) -> np.ndarray:
     """The twin-turbo V8: cross-plane firing into two banks, each with its
-    own exhaust resonance. No turbo whistle (that is its own clip)."""
+    own exhaust resonance. No turbo whistle (that is its own clip). With
+    `muscle`, the big-block: bigger, slower pulses, a lumpy cam that makes
+    the firings uneven at low rpm, and lower, freer pipes."""
     rng = np.random.default_rng(seed)
     n = int(seconds * SR)
     pad = int(0.15 * SR)
     banks = [np.zeros(n + 2 * pad), np.zeros(n + 2 * pad)]
     period = SR / (rpm / 15.0)           # 8 cylinders, 4-stroke: 4 firings per rev
     load = 1.0 if on else 0.3
-    big = stretch(pulse, 1.45)           # bigger cylinders: a lower, longer thump
+    big = stretch(pulse, 1.85 if muscle else 1.45)   # bigger cylinders: a lower, longer thump
+    # Long-duration cam: at low rpm some firings are weak and late (lope).
+    lope = max(0.0, 1 - rpm / 3600) if muscle else 0.0
     pop = stretch(pulse, 2.0)
     t = -pad * 0.5
     k = 0
     while t < n + pad:
         i = k % 8
-        pos = int(pad + t + (V8_WOBBLE[i] + rng.normal(0, 0.004)) * period)
-        amp = load * V8_LEVEL[i] * (1 + rng.normal(0, 0.05))
+        pos = int(pad + t + (V8_WOBBLE[i] * (1 + lope) + rng.normal(0, 0.004 + 0.02 * lope)) * period)
+        amp = load * V8_LEVEL[i] * (1 + rng.normal(0, 0.05 + 0.25 * lope))
         out = banks[V8_BANK[i]]
         if 0 <= pos < len(out):
             seg = big[: len(out) - pos]
@@ -151,10 +160,14 @@ def render_v8(rpm: float, on: bool, pulse: np.ndarray, seed: int, seconds: float
         t += period
         k += 1
     cut = (380 + rpm * 0.10) if on else (300 + rpm * 0.045)
+    pipes = ((68, 190), (84, 230))
+    if muscle:
+        cut = (300 + rpm * 0.085) if on else (240 + rpm * 0.04)
+        pipes = ((52, 150), (63, 175))
     left = lowpass(banks[0], cut)
     right = lowpass(banks[1], cut)
-    ex = (left + 0.55 * resonance(left, 68, 3) + 0.2 * resonance(left, 190, 5)
-          + right + 0.55 * resonance(right, 84, 3) + 0.2 * resonance(right, 230, 5))
+    ex = (left + 0.55 * resonance(left, pipes[0][0], 3) + 0.2 * resonance(left, pipes[0][1], 5)
+          + right + 0.55 * resonance(right, pipes[1][0], 3) + 0.2 * resonance(right, pipes[1][1], 5))
     time = np.arange(len(ex)) / SR
     crank = rpm / 60.0
     mech = 0.03 * np.sin(2 * np.pi * crank * 4 * time) + 0.015 * np.sin(2 * np.pi * crank * 8 * time)
@@ -268,10 +281,14 @@ def to_ogg(wav: Path, ogg: Path, quality: int = 3) -> None:
                     "-q:a", str(quality), str(ogg)], check=True)
 
 
-def grain(pulse: np.ndarray, rpm: int, cycles: int, seed: int, v8: bool = False) -> np.ndarray:
+def grain(pulse: np.ndarray, rpm: int, cycles: int, seed: int, v8: bool = False,
+          muscle: bool = False) -> np.ndarray:
     """`cycles` whole engine cycles (two crank revolutions each) at `rpm`, cut
     from a steady stretch and Hann-windowed so overlapping copies blend."""
-    x = render_v8(rpm, True, pulse, seed, seconds=1.0) if v8 else render(rpm, True, pulse, seed, seconds=1.0)
+    if v8 or muscle:
+        x = render_v8(rpm, True, pulse, seed, seconds=1.0, muscle=muscle)
+    else:
+        x = render(rpm, True, pulse, seed, seconds=1.0)
     cycle = int(round(SR * 120.0 / rpm))           # 2 crank revolutions
     start = int(0.4 * SR)
     g = x[start:start + cycles * cycle]
@@ -342,6 +359,11 @@ def main() -> None:
         sounds[f"v8_{name}"] = x * 0.85 / np.max(np.abs(x))
     v8pop = pop_sound(stretch(pulse, 1.3))
     sounds["v8_pop"] = lowpass(v8pop, 1400) / np.max(np.abs(lowpass(v8pop, 1400))) * 0.95
+    for name, (base, cycles) in BASES.items():
+        x = grain(pulse, base, cycles, seed=base + 2, muscle=True)
+        sounds[f"mv8_{name}"] = x * 0.85 / np.max(np.abs(x))
+    mpop = lowpass(pop_sound(stretch(pulse, 1.5)), 1000)
+    sounds["mv8_pop"] = mpop / np.max(np.abs(mpop)) * 0.95
     sounds["turbo"] = turbo_sound() * 0.8
     sounds["bov"] = bov_sound() * 0.85
 

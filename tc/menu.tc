@@ -149,7 +149,7 @@ function menuChosen(id: str): num {
         return 1;
     }
     line model = carModelOf(default.uuid);
-    if ((id == "model_hatch" && line model == 1) || (id == "model_hyper" && line model == 2)) {
+    if ((id == "model_hatch" && line model == 1) || (id == "model_hyper" && line model == 2) || (id == "model_muscle" && line model == 3)) {
         return 1;
     }
     line tc = tcOn(default.uuid);
@@ -301,8 +301,9 @@ function menuGarage(st: dict): list {
     }
     // Model.
     line out.append({kind: "deco", ent: menuText(st, -0.72, 0.5, "MODEL", "label", 0.45)});
-    line out.append(menuButton(st, "model_hatch", 0.11, 0.5, 0.58, 0.18, "HATCHBACK", 0.34, "model hatch"));
-    line out.append(menuButton(st, "model_hyper", 0.73, 0.5, 0.58, 0.18, "HYPERCAR", 0.34, "model hyper"));
+    line out.append(menuButton(st, "model_hatch", -0.16, 0.5, 0.48, 0.18, "HATCHBACK", 0.29, "model hatch"));
+    line out.append(menuButton(st, "model_hyper", 0.36, 0.5, 0.48, 0.18, "HYPERCAR", 0.29, "model hyper"));
+    line out.append(menuButton(st, "model_muscle", 0.86, 0.5, 0.40, 0.18, "MUSCLE", 0.29, "model muscle"));
     // Colors.
     line hexes = carColorHexes();
     line out.append({kind: "deco", ent: menuText(st, -0.72, 0.27, "PRIMARY", "label", 0.45)});
@@ -487,9 +488,11 @@ function menuAction(action: str) {
         menuRepaint();
         return;
     }
-    if (action == "model hatch" || action == "model hyper") {
+    if (action == "model hatch" || action == "model hyper" || action == "model muscle") {
         if (action == "model hyper") {
             saved carModelSel[line uuid] = 2;
+        } else if (action == "model muscle") {
+            saved carModelSel[line uuid] = 3;
         } else {
             saved carModelSel[line uuid] = 1;
         }

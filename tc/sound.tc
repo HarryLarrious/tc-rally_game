@@ -1,5 +1,5 @@
 // Engine sound (pack/src/engine_sound.py): one short clip of whole
-// firing cycles (inline-4, or the hypercar's V8), played every tick at the engine and pitched to the
+// firing cycles (inline-4, the hypercar's V8 or the muscle car's big-block), played every tick at the engine and pitched to the
 // exact rpm. Consecutive clips overlap, so the pitch follows the rpm in small
 // steps. The cycle is baked at three base speeds so no clip is pitched more
 // than about +-45% (pitching further drags the exhaust tone up and sounds
@@ -11,7 +11,7 @@
  * exhaust torn off it is louder. The hypercar plays the V8 clips, its turbo
  * whistle (pitched and turned up with the boost) and the blow-off valve
  * when the boost is dumped; its overrun pops are deeper and spit flames
- * from the twin tail pipes. */
+ * from the twin tail pipes. The muscle car plays the big-block clips. */
 function engineSound(c: num) {
     if (global cPower[c] <= 0) {
         return;
@@ -20,6 +20,8 @@ function engineSound(c: num) {
     line pre = "";
     if (line v8) {
         line pre = "v8_";
+    } else if (global cModel[c] == 3) {
+        line pre = "mv8_";
     }
     line rpm = global cRpm[c];
     line at = partWorld(c, global iEngine);

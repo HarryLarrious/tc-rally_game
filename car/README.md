@@ -23,6 +23,21 @@ HUD shows the boost in bar. It sounds like a cross-plane V8 (its own clips
 from `pack/src/engine_sound.py`), with a turbo whistle that follows the boost,
 the blow-off valve, and deeper overrun pops that spit flames from the tail
 pipes. The center of mass and total mass stay the rally car's.
+
+The third look is a **muscle car** (`pack/src/car_muscle.py`): a late-sixties
+American fastback coupe on the rally car's chassis, suspension, gearbox,
+radiator and fuel cell. Coke-bottle sides (front fenders and rear haunches
+stand out past the doors) with a crease along the flanks, a long flat hood
+with a raised center and twin scoops, a full-width black grille with round
+lamps at its ends, a pillarless hardtop, a tunnel-back roof (sail panels down
+to the tail, the rear window sunk between them), a ducktail deck, a recessed
+tail panel with four lamps, thin chrome bumpers, an accent-colored stripe
+round the tail and slotted chrome wheels on tall tires. Its engine is a
+front-mounted 7.0 big-block V8 with a round air cleaner and dual exhausts out
+the rear corners. In game it drives only the rear wheels and makes 680 N m
+(best at 4200 rpm, strong from low down), and it plays its own big-block clips
+(`mv8_*`: bigger, slower pulses, a lumpy cam at idle, lower pipes). Its spec is
+`parts_muscle.json`; the viewer shows it with `index.html?car=muscle`.
 It is built from 52 separate parts. Each part is its own resource-pack model on
 its own item display, so any part can take damage, fail, or break off.
 

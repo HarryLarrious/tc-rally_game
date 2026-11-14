@@ -114,8 +114,17 @@ function gearManual(uuid: str): num {
 
 /** Engine torque (N m) of car c at rpm. The hypercar's 4.0 twin-turbo V8:
  * 520 without boost, best at 4500 rpm; the turbos add up to 330 as the
- * boost builds (cBoost, 0..1), from 2000 rpm and fully above 3500. */
+ * boost builds (cBoost, 0..1), from 2000 rpm and fully above 3500. The
+ * muscle car's 7.0 big-block: 680 at 4200 rpm, strong from low down, and
+ * fading toward the limiter. */
 function engineTorqueOf(c: num, rpm: num): num {
+    if (global cModel[c] == 3) {
+        if (rpm > 7800) {
+            return 0;
+        }
+        line mdev = (rpm - 4200) / 3200;
+        return num.max(260, 680 * (1 - 0.5 * line mdev * line mdev));
+    }
     if (global cModel[c] != 2) {
         return engineTorque(rpm);
     }
@@ -582,10 +591,17 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
         }
         // Sideways: take up part of the slip velocity this tick.
         line fy = 0 - line vlat * line meff / line dt * global tLatGain;
-        // Along the wheel: drive (40% front, 60% rear), brakes, rolling.
+        // Along the wheel: drive (40% front, 60% rear; the muscle car
+        // drives only the rear), brakes, rolling.
         line fx = drive * 0.2 * global wDrive[line k];
         if (!line front) {
             line fx = drive * 0.3 * global wDrive[line k];
+        }
+        if (global cModel[c] == 3) {
+            line fx = 0;
+            if (!line front) {
+                line fx = drive * 0.5 * global wDrive[line k];
+            }
         }
         if (brake > 0) {
             line share = 0.2;
@@ -615,7 +631,7 @@ function wheelForce(c: num, i: num, pos: vec, vel: vec, w: vec, L: vec, U: vec, 
             // and more wheelspin means less side grip. Never more drive than
             // the engine gives.
             line sx = 0;
-            if (throttle > 0 && drive != 0 && global wDrive[line k] > 0 && !(hand > 0 && !line front)) {
+            if (throttle > 0 && drive != 0 && global wDrive[line k] > 0 && !(hand > 0 && !line front) && !(line front && global cModel[c] == 3)) {
                 line gr = gearRatio(global cGear[c]);
                 line vw = global cRpm[c] / (line gr * 4.1) / 9.549 * global gWheelR;
                 if (drive < 0) {

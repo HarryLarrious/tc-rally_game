@@ -97,7 +97,8 @@ function carColorHexes(): list {
 declare saved carPaintSel: dict[num];
 declare saved carAccentSel: dict[num];
 
-/** Per player UUID: the chosen car model (1 rally hatchback, 2 hypercar). */
+/** Per player UUID: the chosen car model (1 rally hatchback, 2 hypercar,
+ * 3 muscle car). */
 declare saved carModelSel: dict[num];
 
 /** The player's car model (the hatchback when not chosen). */

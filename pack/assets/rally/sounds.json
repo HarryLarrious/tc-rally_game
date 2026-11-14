@@ -31,6 +31,38 @@
    }
   ]
  },
+ "engine.mv8_hi": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/mv8_hi"
+   }
+  ]
+ },
+ "engine.mv8_lo": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/mv8_lo"
+   }
+  ]
+ },
+ "engine.mv8_mid": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/mv8_mid"
+   }
+  ]
+ },
+ "engine.mv8_pop": {
+  "sounds": [
+   {
+    "attenuation_distance": 40,
+    "name": "rally:engine/mv8_pop"
+   }
+  ]
+ },
  "engine.pop": {
   "sounds": [
    {

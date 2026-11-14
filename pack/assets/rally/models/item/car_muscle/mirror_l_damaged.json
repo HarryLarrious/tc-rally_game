@@ -1,0 +1,198 @@
+{
+ "textures": {
+  "chrome": "rally:item/car/chrome",
+  "glass_dmg": "rally:item/car/glass_dmg",
+  "particle": "rally:item/car/chrome"
+ },
+ "elements": [
+  {
+   "from": [
+    14.9897,
+    15.4732,
+    13.255
+   ],
+   "to": [
+    15.1497,
+    15.6332,
+    13.9196
+   ],
+   "rotation": {
+    "origin": [
+     15.0697,
+     15.5532,
+     13.5873
+    ],
+    "x": -30.401,
+    "y": 102.393,
+    "z": -2.918
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    }
+   }
+  },
+  {
+   "from": [
+    15.1838,
+    15.5007,
+    12.8807
+   ],
+   "to": [
+    15.8238,
+    16.0607,
+    13.8407
+   ],
+   "rotation": {
+    "origin": [
+     15.5038,
+     15.7807,
+     13.3607
+    ],
+    "x": 0.332,
+    "y": -3.016,
+    "z": -3.471
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#chrome"
+    }
+   }
+  },
+  {
+   "from": [
+    15.2369,
+    15.5332,
+    12.6959
+   ],
+   "to": [
+    15.7969,
+    16.0132,
+    12.7359
+   ],
+   "rotation": {
+    "origin": [
+     15.5169,
+     15.7732,
+     12.7159
+    ],
+    "x": -0.229,
+    "y": 3.914,
+    "z": 4.569
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#glass_dmg"
+    }
+   }
+  }
+ ]
+}
