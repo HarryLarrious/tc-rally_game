@@ -43,7 +43,7 @@ function resetTuning {
     // 0.55 of critical (5150), so the body settles after a bump.
     global tSpring = 24000;
     global tDamper = 2800;
-    global tGrip = 1.3;
+    global tGrip = 2;
     global tPower = 1.0;
     global tBrake = 15000;
     global tSteer = 32;
